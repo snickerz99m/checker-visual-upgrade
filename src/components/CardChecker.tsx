@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { CheckerService } from '@/services/checkerService';
+import { CardCheckResponse } from '@/services/api';
 
 interface CheckResult {
   card: string;
@@ -96,95 +98,63 @@ const CardChecker = () => {
     setShowResults(true);
     setCurrentIndex(0);
     setStopChecking(false);
-    
-    const initialResults = cardList.map(card => ({
-      card: card.trim(),
-      status: 'checking' as const,
-      response: 'Waiting...'
-    }));
-    setResults(initialResults);
 
-    try {
-      // Sequential checking (one by one)
-      for (let i = 0; i < cardList.length; i++) {
-        if (stopChecking) break;
-        
-        setCurrentIndex(i);
-        
-        // Update current card status to processing
-        setResults(prev => prev.map((r, idx) => 
-          idx === i ? { ...r, status: 'checking' as const, response: 'Processing...' } : r
-        ));
-
-        // Wait for delay between requests
-        await new Promise(resolve => setTimeout(resolve, parseInt(requestDelay) * 1000));
-        
-        if (stopChecking) break;
-        
-        const card = cardList[i].trim();
-        const cardParts = card.split('|');
-        const cardNumber = cardParts[0];
-        
-        // Mock result generation with more status types
-        const statuses = ['live', 'dead', 'unknown', 'insufficient', 'unknown_decline', 'error'];
-        const status = statuses[Math.floor(Math.random() * statuses.length)] as CheckResult['status'];
-        
-        const responses = {
-          live: ['Approved', 'Success', 'Payment completed', 'Transaction successful'],
-          dead: ['Declined', 'Invalid card', 'Card expired', 'CVV mismatch'],
-          unknown: ['Gateway timeout', 'Rate limited', 'Service unavailable'],
-          insufficient: ['Insufficient funds', 'Insufficient balance', 'Not enough funds'],
-          unknown_decline: ['Generic decline', 'Unknown decline reason', 'Issuer declined'],
-          error: ['Network error', 'Gateway error', 'Processing error', 'Timeout error']
-        };
-
-        const result: CheckResult = {
-          card,
-          status,
-          response: responses[status][Math.floor(Math.random() * responses[status].length)],
-          bin: cardNumber.substring(0, 6),
-          brand: ['Visa', 'Mastercard', 'American Express'][Math.floor(Math.random() * 3)],
-          country: ['United States', 'Canada', 'United Kingdom'][Math.floor(Math.random() * 3)],
-          bank: ['Chase Bank', 'Bank of America', 'Wells Fargo'][Math.floor(Math.random() * 3)]
+    // Start checking with your PHP backend
+    await CheckerService.checkCardsList(
+      cardList,
+      checkerType,
+      { requestDelay: parseInt(requestDelay) },
+      stripeKey,
+      (result) => {
+        // Convert API response to our local format
+        const localResult: CheckResult = {
+          card: result.cardNumber,
+          status: result.status === 'approved' ? 'live' : 
+                  result.status === 'declined' ? 'dead' :
+                  result.status === 'ccn' ? 'unknown' :
+                  result.status as CheckResult['status'],
+          response: result.message,
+          bin: result.bin,
+          brand: result.brand,
+          country: result.country,
+          bank: result.bank
         };
 
         setResults(prev => {
-          const updated = prev.map((r, idx) => idx === i ? result : r);
+          const updated = [...prev];
+          updated[result.index] = localResult;
+          
           // Play sound if card is approved
-          if (result.status === 'live') {
+          if (localResult.status === 'live') {
             setTimeout(() => playApprovedSound(), 100);
           }
           return updated;
         });
+      },
+      (current, total) => {
+        setCurrentIndex(current - 1);
       }
+    );
 
-      if (!stopChecking) {
-        toast({
-          title: "Checking completed",
-          description: `Checked ${cardList.length} cards using ${checkerOptions.find(opt => opt.value === checkerType)?.label}`,
-        });
-      } else {
-        toast({
-          title: "Checking stopped",
-          description: `Stopped at card ${currentIndex + 1}`,
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to check cards",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-      setStopChecking(false);
-      setCurrentIndex(0);
-    }
+    setLoading(false);
+    setStopChecking(false);
+    setCurrentIndex(0);
+    
+    toast({
+      title: "Checking completed",
+      description: `Checked ${cardList.length} cards using ${checkerOptions.find(opt => opt.value === checkerType)?.label}`,
+    });
   };
 
   const stopCheckingCards = () => {
     setStopChecking(true);
+    CheckerService.stopChecking();
+    setLoading(false);
+    toast({
+      title: "Force stopped",
+      description: "All checking operations have been terminated",
+      variant: "destructive"
+    });
   };
 
   const copyResults = (status?: string) => {
@@ -271,6 +241,10 @@ const CardChecker = () => {
               <p>Professional security researcher specializing in payment card validation and BIN analysis.</p>
               <p>🔥 Premium tools for educational and research purposes only.</p>
               <p>👑 Advanced algorithms with high accuracy rates.</p>
+              <div className="flex items-center gap-3 text-sm mt-3">
+                <FileText className="w-4 h-4 text-primary" />
+                <span>Check <code>/src/docs/php-integration.md</code> for easy PHP backend setup</span>
+              </div>
               <div className="flex items-center gap-4 pt-2">
                 <a href="https://t.me/x5pqt" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:text-primary/80">
                   <MessageCircle className="w-4 h-4" />
