@@ -259,9 +259,9 @@ const CardChecker = () => {
           </div>
         </Card>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="space-y-6">
         {/* Input Card */}
-        <Card className="glass neon-border p-6 lg:col-span-1">
+        <Card className="glass neon-border p-8 w-full">
           <div className="space-y-6">
             <div className="text-center">
             <h1 className="text-2xl font-bold text-accent glitch-text mb-2">
@@ -272,7 +272,7 @@ const CardChecker = () => {
             </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Checker Type</label>
                 <Select value={checkerType} onValueChange={setCheckerType}>
@@ -303,55 +303,91 @@ const CardChecker = () => {
                 </div>
               )}
 
+              {/* Settings Button */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Settings</label>
+                <Button
+                  variant="outline"
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  className="cyber-glow w-full"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Checker Settings
+                </Button>
+              </div>
+
+              {/* Force Stop Button (when checking) */}
+              {loading && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Control</label>
+                  <Button
+                    onClick={stopCheckingCards}
+                    variant="destructive"
+                    className="cyber-glow w-full"
+                  >
+                    <StopCircle className="w-4 h-4 mr-2" />
+                    Force Stop
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Settings Panel */}
+            {settingsOpen && (
+              <Card className="glass neon-border p-4 space-y-4 animate-fade-in">
+                <h4 className="font-semibold text-primary">⚙️ Checker Configuration</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Request Delay</label>
+                    <Select value={requestDelay} onValueChange={setRequestDelay}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 second</SelectItem>
+                        <SelectItem value="2">2 seconds</SelectItem>
+                        <SelectItem value="3">3 seconds</SelectItem>
+                        <SelectItem value="5">5 seconds</SelectItem>
+                        <SelectItem value="10">10 seconds</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Processing Mode</label>
+                    <Badge variant="secondary" className="w-full justify-center py-1">
+                      Sequential (One by One)
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Sound Alerts</label>
+                    <Badge variant="outline" className="w-full justify-center py-1">
+                      🔊 Enabled for Approved
+                    </Badge>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  💡 Higher delays reduce detection risk but increase checking time. Cards are processed sequentially to avoid rate limiting.
+                </div>
+              </Card>
+            )}
+
+            <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">
-                    Cards to Check
+                    Cards to Check (Format: card|expiry|cvv)
                   </label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSettingsOpen(!settingsOpen)}
-                    className="cyber-glow"
-                  >
-                    <Settings className="w-3 h-3 mr-1" />
-                    Settings
-                  </Button>
                 </div>
-                
-                {/* Settings Menu */}
-                {settingsOpen && (
-                  <Card className="glass neon-border p-4 space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium">Request Delay (seconds)</label>
-                      <Select value={requestDelay} onValueChange={setRequestDelay}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 second</SelectItem>
-                          <SelectItem value="2">2 seconds</SelectItem>
-                          <SelectItem value="3">3 seconds</SelectItem>
-                          <SelectItem value="5">5 seconds</SelectItem>
-                          <SelectItem value="10">10 seconds</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      💡 Higher delays reduce detection risk but increase checking time
-                    </div>
-                  </Card>
-                )}
 
                 <Textarea
                   value={cards}
                   onChange={(e) => setCards(e.target.value)}
                   placeholder="4242424242424242|12/28|123&#10;5555555555554444|01/29|456&#10;4000000000000002|06/27|789&#10;378282246310005|12/30|100"
-                  className="font-mono text-xs min-h-[140px] cyber-glow"
+                  className="font-mono text-sm min-h-[200px] cyber-glow"
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-4">
                 <Button
                   onClick={checkCards}
                   disabled={loading || !cards.trim()}
@@ -360,55 +396,44 @@ const CardChecker = () => {
                 >
                   {loading ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       Checking... ({currentIndex + 1})
                     </div>
                   ) : (
                     <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Check Cards
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      Start Elite Checking
                     </>
                   )}
                 </Button>
-                
-                {loading && (
-                  <Button
-                    onClick={stopCheckingCards}
-                    variant="destructive"
-                    size="lg"
-                    className="cyber-glow"
-                  >
-                    <StopCircle className="w-4 h-4" />
-                  </Button>
-                )}
               </div>
 
-              {/* Stats */}
+              {/* Live Stats Dashboard */}
               {showResults && (
-                <div className="grid grid-cols-2 gap-2 pt-4">
-                  <div className="text-center p-2 rounded bg-primary/20 border border-primary/30">
-                    <div className="text-sm font-bold text-primary">{approvedCards.length}</div>
-                    <div className="text-xs text-muted-foreground">LIVE</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-4">
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/30 cyber-glow">
+                    <div className="text-lg font-bold text-primary">{approvedCards.length}</div>
+                    <div className="text-xs text-primary font-medium">👻 APPROVED</div>
                   </div>
-                  <div className="text-center p-2 rounded bg-destructive/20 border border-destructive/30">
-                    <div className="text-sm font-bold text-destructive">{declinedCards.length}</div>
-                    <div className="text-xs text-muted-foreground">DEAD</div>
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-muted/20 to-muted/10 border border-muted/30">
+                    <div className="text-lg font-bold text-muted-foreground">{unknownCards.length}</div>
+                    <div className="text-xs text-muted-foreground font-medium">⏳ CCN</div>
                   </div>
-                  <div className="text-center p-2 rounded bg-muted/20 border border-muted/30">
-                    <div className="text-sm font-bold text-muted-foreground">{unknownCards.length}</div>
-                    <div className="text-xs text-muted-foreground">CCN</div>
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-destructive/20 to-destructive/10 border border-destructive/30">
+                    <div className="text-lg font-bold text-destructive">{declinedCards.length}</div>
+                    <div className="text-xs text-destructive font-medium">❌ DECLINED</div>
                   </div>
-                  <div className="text-center p-2 rounded bg-orange-500/20 border border-orange-500/30">
-                    <div className="text-sm font-bold text-orange-400">{insufficientCards.length}</div>
-                    <div className="text-xs text-muted-foreground">INSUFF</div>
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-orange-500/20 to-orange-500/10 border border-orange-500/30">
+                    <div className="text-lg font-bold text-orange-400">{insufficientCards.length}</div>
+                    <div className="text-xs text-orange-400 font-medium">💳 INSUFFICIENT</div>
                   </div>
-                  <div className="text-center p-2 rounded bg-purple-500/20 border border-purple-500/30">
-                    <div className="text-sm font-bold text-purple-400">{unknownDeclineCards.length}</div>
-                    <div className="text-xs text-muted-foreground">UNK DEC</div>
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-500/10 border border-purple-500/30">
+                    <div className="text-lg font-bold text-purple-400">{unknownDeclineCards.length}</div>
+                    <div className="text-xs text-purple-400 font-medium">❓ UNKNOWN</div>
                   </div>
-                  <div className="text-center p-2 rounded bg-red-500/20 border border-red-500/30">
-                    <div className="text-sm font-bold text-red-400">{errorCards.length}</div>
-                    <div className="text-xs text-muted-foreground">ERRORS</div>
+                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-red-500/20 to-red-500/10 border border-red-500/30">
+                    <div className="text-lg font-bold text-red-400">{errorCards.length}</div>
+                    <div className="text-xs text-red-400 font-medium">🔥 ERRORS</div>
                   </div>
                 </div>
               )}
@@ -416,9 +441,9 @@ const CardChecker = () => {
           </div>
         </Card>
 
-        {/* Results Windows */}
+        {/* Elite Results Windows */}
         {showResults && (
-          <div className="lg:col-span-2 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             {/* Approved Cards Window */}
             <Card className="glass neon-border animate-fade-in">
               <Collapsible open={approvedOpen} onOpenChange={setApprovedOpen}>
