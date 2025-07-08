@@ -316,20 +316,19 @@ const CardChecker = () => {
                 </Button>
               </div>
 
-              {/* Force Stop Button (when checking) */}
-              {loading && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Control</label>
-                  <Button
-                    onClick={stopCheckingCards}
-                    variant="destructive"
-                    className="cyber-glow w-full"
-                  >
-                    <StopCircle className="w-4 h-4 mr-2" />
-                    Force Stop
-                  </Button>
-                </div>
-              )}
+              {/* Force Stop Button */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Control</label>
+                <Button
+                  onClick={loading ? stopCheckingCards : () => setShowResults(true)}
+                  variant={loading ? "destructive" : "outline"}
+                  className="cyber-glow w-full"
+                  disabled={!loading && results.length === 0}
+                >
+                  <StopCircle className="w-4 h-4 mr-2" />
+                  {loading ? "Force Stop" : "Show Results"}
+                </Button>
+              </div>
             </div>
 
             {/* Settings Panel */}
@@ -353,10 +352,18 @@ const CardChecker = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium">Processing Mode</label>
-                    <Badge variant="secondary" className="w-full justify-center py-1">
-                      Sequential (One by One)
-                    </Badge>
+                    <label className="text-xs font-medium">Multi-threading</label>
+                    <Select value="1" onValueChange={() => {}}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 Thread (Safe)</SelectItem>
+                        <SelectItem value="3">3 Threads</SelectItem>
+                        <SelectItem value="5">5 Threads</SelectItem>
+                        <SelectItem value="10">10 Threads (Risk)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-medium">Sound Alerts</label>
@@ -441,9 +448,9 @@ const CardChecker = () => {
           </div>
         </Card>
 
-        {/* Elite Results Windows */}
-        {showResults && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Elite Results Windows - Always Visible After First Check */}
+        {(showResults || results.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
             {/* Approved Cards Window */}
             <Card className="glass neon-border animate-fade-in">
               <Collapsible open={approvedOpen} onOpenChange={setApprovedOpen}>

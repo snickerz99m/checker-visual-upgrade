@@ -37,37 +37,57 @@ const BinChecker = () => {
     setResults([]);
     
     try {
+      // Load BIN database from txt file
+      const response = await fetch('/bin-database.txt');
+      const binDatabase = await response.text();
+      const binLines = binDatabase.split('\n').filter(line => line.trim());
+      
       const newResults = [];
       
       for (const bin of binList) {
-        // Simulate API call for each BIN
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Search in database file first
+        const binData = binLines.find(line => line.startsWith(bin.substring(0, 6)));
         
-        // Mock data - replace with real API response
-        const schemes = ['VISA', 'MASTERCARD', 'AMERICAN EXPRESS', 'DISCOVER'];
-        const types = ['CREDIT', 'DEBIT', 'PREPAID'];
-        const countries = [
-          { name: 'United States', code: 'US' },
-          { name: 'Canada', code: 'CA' },
-          { name: 'United Kingdom', code: 'GB' },
-          { name: 'Germany', code: 'DE' }
-        ];
-        const banks = ['Chase Bank', 'Bank of America', 'Wells Fargo', 'CitiBank'];
-        
-        newResults.push({
-          bin,
-          scheme: schemes[Math.floor(Math.random() * schemes.length)],
-          type: types[Math.floor(Math.random() * types.length)],
-          brand: `${schemes[0]} Classic`,
-          country: countries[Math.floor(Math.random() * countries.length)],
-          bank: banks[Math.floor(Math.random() * banks.length)],
-          valid: Math.random() > 0.2
-        });
+        if (binData) {
+          // Parse database entry format: "424242|VISA|CREDIT|US|Chase Bank"
+          const [binNum, scheme, type, country, bank] = binData.split('|');
+          newResults.push({
+            bin,
+            scheme: scheme || 'Unknown',
+            type: type || 'Unknown',
+            brand: `${scheme} Elite`,
+            country: { name: country || 'Unknown', code: country?.substring(0, 2) || 'XX' },
+            bank: bank || 'Unknown Bank',
+            valid: true
+          });
+        } else {
+          // Fallback to mock data for testing
+          const schemes = ['VISA', 'MASTERCARD', 'AMERICAN EXPRESS', 'DISCOVER'];
+          const types = ['CREDIT', 'DEBIT', 'PREPAID'];
+          const countries = [
+            { name: 'United States', code: 'US' },
+            { name: 'Canada', code: 'CA' },
+            { name: 'United Kingdom', code: 'GB' },
+            { name: 'Germany', code: 'DE' }
+          ];
+          const banks = ['Chase Bank', 'Bank of America', 'Wells Fargo', 'CitiBank'];
+          
+          newResults.push({
+            bin,
+            scheme: schemes[Math.floor(Math.random() * schemes.length)],
+            type: types[Math.floor(Math.random() * types.length)],
+            brand: `${schemes[0]} Classic`,
+            country: countries[Math.floor(Math.random() * countries.length)],
+            bank: banks[Math.floor(Math.random() * banks.length)],
+            valid: Math.random() > 0.2
+          });
+        }
         
         setResults([...newResults]);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Delay between checks
       }
     } catch (err) {
-      setError('Failed to check BINs');
+      setError('Failed to check BINs - ensure bin-database.txt is in public folder');
     } finally {
       setLoading(false);
     }

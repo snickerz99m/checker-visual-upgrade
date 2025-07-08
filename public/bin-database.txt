@@ -1,0 +1,20 @@
+424242|VISA|CREDIT|United States|Chase Bank
+555555|MASTERCARD|CREDIT|United States|Bank of America
+378282|AMERICAN EXPRESS|CREDIT|United States|American Express
+411111|VISA|CREDIT|United States|Wells Fargo
+434343|VISA|DEBIT|United States|CitiBank
+400000|VISA|CREDIT|United States|JPMorgan Chase
+520000|MASTERCARD|CREDIT|United States|Capital One
+340000|AMERICAN EXPRESS|CREDIT|United States|American Express
+543210|MASTERCARD|DEBIT|Canada|Royal Bank of Canada
+480000|VISA|CREDIT|United Kingdom|Barclays Bank
+510000|MASTERCARD|CREDIT|Germany|Deutsche Bank
+601100|DISCOVER|CREDIT|United States|Discover Bank
+445566|VISA|PREPAID|United States|Green Dot Bank
+528800|MASTERCARD|CREDIT|United Kingdom|HSBC Bank
+370000|AMERICAN EXPRESS|CREDIT|Canada|American Express Canada
+485700|VISA|DEBIT|Australia|Commonwealth Bank
+523456|MASTERCARD|CREDIT|France|BNP Paribas
+440000|VISA|CREDIT|Netherlands|ING Bank
+676700|MAESTRO|DEBIT|United Kingdom|Santander UK
+490000|VISA|CREDIT|Italy|UniCredit
