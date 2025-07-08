@@ -80,10 +80,10 @@ const BinChecker = () => {
         <div className="space-y-6">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-primary glitch-text mb-2">
-              BIN CHECKER
+              👻 BIN CHECKER
             </h1>
             <p className="text-muted-foreground">
-              Professional Bank Identification Number Lookup
+              Elite Bank Identification Number Analysis
             </p>
           </div>
 
@@ -95,7 +95,7 @@ const BinChecker = () => {
               <Textarea
                 value={bins}
                 onChange={(e) => setBins(e.target.value)}
-                placeholder="424242&#10;555555&#10;378282"
+                placeholder="424242&#10;555555&#10;378282&#10;411111&#10;434343"
                 className="font-mono cyber-glow min-h-[120px]"
               />
             </div>

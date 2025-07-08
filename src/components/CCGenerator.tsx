@@ -131,10 +131,10 @@ const CCGenerator = () => {
         <div className="space-y-6">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-secondary glitch-text mb-2">
-              CC GENERATOR
+              👻 CC GENERATOR
             </h1>
             <p className="text-muted-foreground">
-              Professional Card Generation Tool
+              Elite Card Generation Engine
             </p>
           </div>
 
@@ -144,7 +144,7 @@ const CCGenerator = () => {
               <Input
                 value={bin}
                 onChange={(e) => setBin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                placeholder="424242"
+                placeholder="424242 (Enter BIN)"
                 className="cyber-glow"
               />
             </div>

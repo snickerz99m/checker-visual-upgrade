@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Shield, ExternalLink, MessageCircle } from 'lucide-react';
+import { Ghost, ExternalLink, MessageCircle } from 'lucide-react';
 
 const Header = () => {
   const [activeTab, setActiveTab] = useState('bin-checker');
@@ -39,23 +39,23 @@ const Header = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Shield className="w-8 h-8 text-primary" />
+              <Ghost className="w-8 h-8 text-primary animate-pulse" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
                   3MK <span className="text-primary">PABLO</span>
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Professional Security Tools
+                  Elite Security Research Platform
                 </p>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="cyber-glow">
-                🔥 Premium
+                👻 Elite
               </Badge>
               <Badge variant="outline">
-                👑 Pro
+                ⚡ Advanced
               </Badge>
             </div>
           </div>

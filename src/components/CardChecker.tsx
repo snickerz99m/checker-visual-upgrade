@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle, FileText } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle, FileText, Ghost } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { CheckerService } from '@/services/checkerService';
@@ -234,16 +234,16 @@ const CardChecker = () => {
         <Card className="glass neon-border p-6 animate-fade-in">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" />
+              <Ghost className="w-5 h-5 text-primary animate-pulse" />
               <h2 className="text-xl font-semibold">About 3MK PABLO</h2>
             </div>
             <div className="text-muted-foreground space-y-2">
-              <p>Professional security researcher specializing in payment card validation and BIN analysis.</p>
-              <p>🔥 Premium tools for educational and research purposes only.</p>
-              <p>👑 Advanced algorithms with high accuracy rates.</p>
+              <p>👻 Elite security researcher specializing in advanced payment validation systems.</p>
+              <p>🔮 Cutting-edge algorithms with military-grade precision and stealth capabilities.</p>
+              <p>⚡ Professional-grade tools designed for expert penetration testing and security research.</p>
               <div className="flex items-center gap-3 text-sm mt-3">
                 <FileText className="w-4 h-4 text-primary" />
-                <span>Check <code>/src/docs/php-integration.md</code> for easy PHP backend setup</span>
+                <span>Backend integration guide: <code>/src/docs/php-integration.md</code></span>
               </div>
               <div className="flex items-center gap-4 pt-2">
                 <a href="https://t.me/x5pqt" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:text-primary/80">
@@ -252,7 +252,7 @@ const CardChecker = () => {
                 </a>
                 <a href="https://t.me/criminalworld0" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-secondary hover:text-secondary/80">
                   <MessageCircle className="w-4 h-4" />
-                  Join Updates Group
+                  Elite Updates Channel
                 </a>
               </div>
             </div>
@@ -264,12 +264,12 @@ const CardChecker = () => {
         <Card className="glass neon-border p-6 lg:col-span-1">
           <div className="space-y-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-accent glitch-text mb-2">
-                CARD CHECKER
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Professional Mass Card Validation
-              </p>
+            <h1 className="text-2xl font-bold text-accent glitch-text mb-2">
+              👻 CARD CHECKER
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Elite Mass Card Validation System
+            </p>
             </div>
 
             <div className="space-y-4">
@@ -297,7 +297,7 @@ const CardChecker = () => {
                     type="password"
                     value={stripeKey}
                     onChange={(e) => setStripeKey(e.target.value)}
-                    placeholder="sk_test_..."
+                    placeholder="sk_test_... (Required for Stripe)"
                     className="cyber-glow"
                   />
                 </div>
@@ -346,7 +346,7 @@ const CardChecker = () => {
                 <Textarea
                   value={cards}
                   onChange={(e) => setCards(e.target.value)}
-                  placeholder="4242424242424242|12/25|123&#10;5555555555554444|01/26|456"
+                  placeholder="4242424242424242|12/28|123&#10;5555555555554444|01/29|456&#10;4000000000000002|06/27|789&#10;378282246310005|12/30|100"
                   className="font-mono text-xs min-h-[140px] cyber-glow"
                 />
               </div>

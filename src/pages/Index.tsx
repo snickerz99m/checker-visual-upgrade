@@ -64,10 +64,10 @@ const Index = () => {
         <footer className="mt-16 border-t border-border/30 bg-card/20 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto p-6 text-center">
             <p className="text-muted-foreground text-sm">
-              © 2024 3MK PABLO Tools. Professional security research platform.
+              © 2024 3MK PABLO Tools. Elite security research platform.
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              Educational purposes only. Use responsibly.
+              Professional security testing • Research purposes only • Use responsibly.
             </p>
           </div>
         </footer>
