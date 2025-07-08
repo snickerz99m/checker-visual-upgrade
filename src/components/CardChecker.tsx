@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2 } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
 interface CheckResult {
   card: string;
-  status: 'live' | 'dead' | 'unknown' | 'checking';
+  status: 'live' | 'dead' | 'unknown' | 'checking' | 'insufficient' | 'unknown_decline' | 'error';
   response: string;
   bin?: string;
   brand?: string;
@@ -29,7 +30,15 @@ const CardChecker = () => {
   const [approvedOpen, setApprovedOpen] = useState(true);
   const [ccnOpen, setCcnOpen] = useState(true);
   const [declinedOpen, setDeclinedOpen] = useState(true);
+  const [insufficientOpen, setInsufficientOpen] = useState(true);
+  const [unknownDeclineOpen, setUnknownDeclineOpen] = useState(true);
+  const [errorsOpen, setErrorsOpen] = useState(true);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [requestDelay, setRequestDelay] = useState('2');
+  const [stripeKey, setStripeKey] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [stopChecking, setStopChecking] = useState(false);
   const { toast } = useToast();
 
   // Sound effect for approved cards
@@ -53,6 +62,7 @@ const CardChecker = () => {
 
   const checkerOptions = [
     { value: 'stripe', label: 'Stripe Checker' },
+    { value: 'stripe_sk', label: 'Stripe SK Checker' },
     { value: 'paypal', label: 'PayPal Checker' },
     { value: 'square', label: 'Square Checker' },
     { value: 'braintree', label: 'Braintree Checker' },
@@ -72,34 +82,60 @@ const CardChecker = () => {
       return;
     }
 
+    if (checkerType === 'stripe_sk' && !stripeKey.trim()) {
+      toast({
+        title: "Stripe SK Required",
+        description: "Please enter your Stripe Secret Key",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     setResults([]);
     setShowResults(true);
+    setCurrentIndex(0);
+    setStopChecking(false);
     
     const initialResults = cardList.map(card => ({
       card: card.trim(),
       status: 'checking' as const,
-      response: 'Processing...'
+      response: 'Waiting...'
     }));
     setResults(initialResults);
 
     try {
-      // Simulate checking each card
+      // Sequential checking (one by one)
       for (let i = 0; i < cardList.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+        if (stopChecking) break;
+        
+        setCurrentIndex(i);
+        
+        // Update current card status to processing
+        setResults(prev => prev.map((r, idx) => 
+          idx === i ? { ...r, status: 'checking' as const, response: 'Processing...' } : r
+        ));
+
+        // Wait for delay between requests
+        await new Promise(resolve => setTimeout(resolve, parseInt(requestDelay) * 1000));
+        
+        if (stopChecking) break;
         
         const card = cardList[i].trim();
         const cardParts = card.split('|');
         const cardNumber = cardParts[0];
         
-        // Mock result generation
-        const statuses = ['live', 'dead', 'unknown'];
-        const status = statuses[Math.floor(Math.random() * statuses.length)] as 'live' | 'dead' | 'unknown';
+        // Mock result generation with more status types
+        const statuses = ['live', 'dead', 'unknown', 'insufficient', 'unknown_decline', 'error'];
+        const status = statuses[Math.floor(Math.random() * statuses.length)] as CheckResult['status'];
         
         const responses = {
           live: ['Approved', 'Success', 'Payment completed', 'Transaction successful'],
-          dead: ['Declined', 'Invalid card', 'Insufficient funds', 'Card expired', 'CVV mismatch'],
-          unknown: ['Gateway timeout', 'Rate limited', 'Service unavailable', 'Network error']
+          dead: ['Declined', 'Invalid card', 'Card expired', 'CVV mismatch'],
+          unknown: ['Gateway timeout', 'Rate limited', 'Service unavailable'],
+          insufficient: ['Insufficient funds', 'Insufficient balance', 'Not enough funds'],
+          unknown_decline: ['Generic decline', 'Unknown decline reason', 'Issuer declined'],
+          error: ['Network error', 'Gateway error', 'Processing error', 'Timeout error']
         };
 
         const result: CheckResult = {
@@ -122,10 +158,18 @@ const CardChecker = () => {
         });
       }
 
-      toast({
-        title: "Checking completed",
-        description: `Checked ${cardList.length} cards using ${checkerOptions.find(opt => opt.value === checkerType)?.label}`,
-      });
+      if (!stopChecking) {
+        toast({
+          title: "Checking completed",
+          description: `Checked ${cardList.length} cards using ${checkerOptions.find(opt => opt.value === checkerType)?.label}`,
+        });
+      } else {
+        toast({
+          title: "Checking stopped",
+          description: `Stopped at card ${currentIndex + 1}`,
+          variant: "destructive"
+        });
+      }
     } catch (err) {
       toast({
         title: "Error",
@@ -134,7 +178,13 @@ const CardChecker = () => {
       });
     } finally {
       setLoading(false);
+      setStopChecking(false);
+      setCurrentIndex(0);
     }
+  };
+
+  const stopCheckingCards = () => {
+    setStopChecking(true);
   };
 
   const copyResults = (status?: string) => {
@@ -178,6 +228,9 @@ const CardChecker = () => {
   const approvedCards = results.filter(r => r.status === 'live');
   const declinedCards = results.filter(r => r.status === 'dead');
   const unknownCards = results.filter(r => r.status === 'unknown');
+  const insufficientCards = results.filter(r => r.status === 'insufficient');
+  const unknownDeclineCards = results.filter(r => r.status === 'unknown_decline');
+  const errorCards = results.filter(r => r.status === 'error');
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
@@ -262,51 +315,126 @@ const CardChecker = () => {
                 </Select>
               </div>
 
+              {/* Stripe SK Input (conditional) */}
+              {checkerType === 'stripe_sk' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Stripe Secret Key</label>
+                  <Input
+                    type="password"
+                    value={stripeKey}
+                    onChange={(e) => setStripeKey(e.target.value)}
+                    placeholder="sk_test_..."
+                    className="cyber-glow"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Cards to Check
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">
+                    Cards to Check
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSettingsOpen(!settingsOpen)}
+                    className="cyber-glow"
+                  >
+                    <Settings className="w-3 h-3 mr-1" />
+                    Settings
+                  </Button>
+                </div>
+                
+                {/* Settings Menu */}
+                {settingsOpen && (
+                  <Card className="glass neon-border p-4 space-y-3">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium">Request Delay (seconds)</label>
+                      <Select value={requestDelay} onValueChange={setRequestDelay}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 second</SelectItem>
+                          <SelectItem value="2">2 seconds</SelectItem>
+                          <SelectItem value="3">3 seconds</SelectItem>
+                          <SelectItem value="5">5 seconds</SelectItem>
+                          <SelectItem value="10">10 seconds</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      💡 Higher delays reduce detection risk but increase checking time
+                    </div>
+                  </Card>
+                )}
+
                 <Textarea
                   value={cards}
                   onChange={(e) => setCards(e.target.value)}
                   placeholder="4242424242424242|12/25|123&#10;5555555555554444|01/26|456"
-                  className="font-mono text-xs min-h-[120px] cyber-glow"
+                  className="font-mono text-xs min-h-[140px] cyber-glow"
                 />
               </div>
 
-              <Button
-                onClick={checkCards}
-                disabled={loading || !cards.trim()}
-                className="w-full cyber-glow"
-                size="lg"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Checking...
-                  </div>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Check Cards
-                  </>
+              <div className="flex gap-2">
+                <Button
+                  onClick={checkCards}
+                  disabled={loading || !cards.trim()}
+                  className="flex-1 cyber-glow"
+                  size="lg"
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Checking... ({currentIndex + 1})
+                    </div>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Check Cards
+                    </>
+                  )}
+                </Button>
+                
+                {loading && (
+                  <Button
+                    onClick={stopCheckingCards}
+                    variant="destructive"
+                    size="lg"
+                    className="cyber-glow"
+                  >
+                    <StopCircle className="w-4 h-4" />
+                  </Button>
                 )}
-              </Button>
+              </div>
 
               {/* Stats */}
               {showResults && (
-                <div className="grid grid-cols-3 gap-2 pt-4">
-                  <div className="text-center p-3 rounded bg-primary/20 border border-primary/30">
-                    <div className="text-lg font-bold text-primary">{approvedCards.length}</div>
+                <div className="grid grid-cols-2 gap-2 pt-4">
+                  <div className="text-center p-2 rounded bg-primary/20 border border-primary/30">
+                    <div className="text-sm font-bold text-primary">{approvedCards.length}</div>
                     <div className="text-xs text-muted-foreground">LIVE</div>
                   </div>
-                  <div className="text-center p-3 rounded bg-destructive/20 border border-destructive/30">
-                    <div className="text-lg font-bold text-destructive">{declinedCards.length}</div>
+                  <div className="text-center p-2 rounded bg-destructive/20 border border-destructive/30">
+                    <div className="text-sm font-bold text-destructive">{declinedCards.length}</div>
                     <div className="text-xs text-muted-foreground">DEAD</div>
                   </div>
-                  <div className="text-center p-3 rounded bg-muted/20 border border-muted/30">
-                    <div className="text-lg font-bold text-muted-foreground">{unknownCards.length}</div>
+                  <div className="text-center p-2 rounded bg-muted/20 border border-muted/30">
+                    <div className="text-sm font-bold text-muted-foreground">{unknownCards.length}</div>
                     <div className="text-xs text-muted-foreground">CCN</div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-orange-500/20 border border-orange-500/30">
+                    <div className="text-sm font-bold text-orange-400">{insufficientCards.length}</div>
+                    <div className="text-xs text-muted-foreground">INSUFF</div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-purple-500/20 border border-purple-500/30">
+                    <div className="text-sm font-bold text-purple-400">{unknownDeclineCards.length}</div>
+                    <div className="text-xs text-muted-foreground">UNK DEC</div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-red-500/20 border border-red-500/30">
+                    <div className="text-sm font-bold text-red-400">{errorCards.length}</div>
+                    <div className="text-xs text-muted-foreground">ERRORS</div>
                   </div>
                 </div>
               )}
@@ -521,6 +649,222 @@ const CardChecker = () => {
                             <div className="flex justify-between items-start">
                               <span>{result.card}</span>
                               <Badge variant="destructive" className="text-xs">DEAD</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {result.response} • {result.brand} • {result.country}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* Insufficient Cards Window */}
+            <Card className="glass neon-border animate-fade-in">
+              <Collapsible open={insufficientOpen} onOpenChange={setInsufficientOpen}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-orange-500/5 border-b border-border/30">
+                    <div className="flex items-center gap-3">
+                      <DollarSign className="w-5 h-5 text-orange-400" />
+                      <h3 className="text-lg font-semibold text-orange-400">Insufficient Cards</h3>
+                      <Badge variant="secondary" className="bg-orange-500/20 text-orange-400">
+                        {insufficientCards.length}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {insufficientCards.length > 0 && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); copyResults('insufficient'); }}>
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); downloadResults('insufficient'); }}>
+                            <Download className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="destructive" onClick={(e) => e.stopPropagation()}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="glass neon-border">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Clear Insufficient Cards?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently remove all insufficient cards from the results.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => clearResults('insufficient')}>
+                                  Clear
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                      {insufficientOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 max-h-[400px] overflow-auto">
+                    {insufficientCards.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">No insufficient cards yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {insufficientCards.map((result, index) => (
+                          <div key={index} className="font-mono text-sm p-2 rounded bg-orange-500/10 border border-orange-500/20">
+                            <div className="flex justify-between items-start">
+                              <span>{result.card}</span>
+                              <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">INSUFFICIENT</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {result.response} • {result.brand} • {result.country}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* Unknown Decline Cards Window */}
+            <Card className="glass neon-border animate-fade-in">
+              <Collapsible open={unknownDeclineOpen} onOpenChange={setUnknownDeclineOpen}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-purple-500/5 border-b border-border/30">
+                    <div className="flex items-center gap-3">
+                      <HelpCircle className="w-5 h-5 text-purple-400" />
+                      <h3 className="text-lg font-semibold text-purple-400">Unknown Decline</h3>
+                      <Badge variant="secondary" className="bg-purple-500/20 text-purple-400">
+                        {unknownDeclineCards.length}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {unknownDeclineCards.length > 0 && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); copyResults('unknown_decline'); }}>
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); downloadResults('unknown_decline'); }}>
+                            <Download className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="destructive" onClick={(e) => e.stopPropagation()}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="glass neon-border">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Clear Unknown Decline Cards?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently remove all unknown decline cards from the results.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => clearResults('unknown_decline')}>
+                                  Clear
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                      {unknownDeclineOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 max-h-[400px] overflow-auto">
+                    {unknownDeclineCards.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">No unknown decline cards yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {unknownDeclineCards.map((result, index) => (
+                          <div key={index} className="font-mono text-sm p-2 rounded bg-purple-500/10 border border-purple-500/20">
+                            <div className="flex justify-between items-start">
+                              <span>{result.card}</span>
+                              <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">UNK DECLINE</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {result.response} • {result.brand} • {result.country}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* Errors Cards Window */}
+            <Card className="glass neon-border animate-fade-in">
+              <Collapsible open={errorsOpen} onOpenChange={setErrorsOpen}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-red-500/5 border-b border-border/30">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400" />
+                      <h3 className="text-lg font-semibold text-red-400">Error Cards</h3>
+                      <Badge variant="secondary" className="bg-red-500/20 text-red-400">
+                        {errorCards.length}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {errorCards.length > 0 && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); copyResults('error'); }}>
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); downloadResults('error'); }}>
+                            <Download className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="destructive" onClick={(e) => e.stopPropagation()}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="glass neon-border">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Clear Error Cards?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently remove all error cards from the results.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => clearResults('error')}>
+                                  Clear
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
+                      {errorsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 max-h-[400px] overflow-auto">
+                    {errorCards.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">No error cards yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {errorCards.map((result, index) => (
+                          <div key={index} className="font-mono text-sm p-2 rounded bg-red-500/10 border border-red-500/20">
+                            <div className="flex justify-between items-start">
+                              <span>{result.card}</span>
+                              <Badge variant="secondary" className="text-xs bg-red-500/20 text-red-400">ERROR</Badge>
                             </div>
                             <div className="text-xs text-muted-foreground mt-1">
                               {result.response} • {result.brand} • {result.country}
