@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CreditCard, Shield, MapPin, Building, CheckCircle, XCircle } from 'lucide-react';
@@ -19,38 +19,55 @@ interface BinInfo {
 }
 
 const BinChecker = () => {
-  const [bin, setBin] = useState('');
+  const [bins, setBins] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<BinInfo | null>(null);
+  const [results, setResults] = useState<(BinInfo & { bin: string })[]>([]);
   const [error, setError] = useState('');
 
-  const checkBin = async () => {
-    if (bin.length < 6) {
-      setError('BIN must be at least 6 digits');
+  const checkBins = async () => {
+    const binList = bins.split(/[\n,]/).map(b => b.trim()).filter(b => b.length >= 6);
+    
+    if (binList.length === 0) {
+      setError('Please enter at least one valid BIN (6+ digits)');
       return;
     }
 
     setLoading(true);
     setError('');
+    setResults([]);
     
     try {
-      // Simulate API call - replace with your backend endpoint
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const newResults = [];
       
-      // Mock data - replace with real API response
-      setResult({
-        scheme: 'VISA',
-        type: 'CREDIT',
-        brand: 'Visa Classic',
-        country: {
-          name: 'United States',
-          code: 'US'
-        },
-        bank: 'Chase Bank',
-        valid: true
-      });
+      for (const bin of binList) {
+        // Simulate API call for each BIN
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Mock data - replace with real API response
+        const schemes = ['VISA', 'MASTERCARD', 'AMERICAN EXPRESS', 'DISCOVER'];
+        const types = ['CREDIT', 'DEBIT', 'PREPAID'];
+        const countries = [
+          { name: 'United States', code: 'US' },
+          { name: 'Canada', code: 'CA' },
+          { name: 'United Kingdom', code: 'GB' },
+          { name: 'Germany', code: 'DE' }
+        ];
+        const banks = ['Chase Bank', 'Bank of America', 'Wells Fargo', 'CitiBank'];
+        
+        newResults.push({
+          bin,
+          scheme: schemes[Math.floor(Math.random() * schemes.length)],
+          type: types[Math.floor(Math.random() * types.length)],
+          brand: `${schemes[0]} Classic`,
+          country: countries[Math.floor(Math.random() * countries.length)],
+          bank: banks[Math.floor(Math.random() * banks.length)],
+          valid: Math.random() > 0.2
+        });
+        
+        setResults([...newResults]);
+      }
     } catch (err) {
-      setError('Failed to check BIN');
+      setError('Failed to check BINs');
     } finally {
       setLoading(false);
     }
@@ -73,32 +90,31 @@ const BinChecker = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Enter BIN (First 6-8 digits)
+                Enter BINs (one per line or comma-separated)
               </label>
-              <Input
-                value={bin}
-                onChange={(e) => setBin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                placeholder="e.g., 424242"
-                className="text-lg cyber-glow"
-                maxLength={8}
+              <Textarea
+                value={bins}
+                onChange={(e) => setBins(e.target.value)}
+                placeholder="424242&#10;555555&#10;378282"
+                className="font-mono cyber-glow min-h-[120px]"
               />
             </div>
 
             <Button
-              onClick={checkBin}
-              disabled={loading || bin.length < 6}
+              onClick={checkBins}
+              disabled={loading || !bins.trim()}
               className="w-full cyber-glow"
               size="lg"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Checking BIN...
+                  Checking BINs...
                 </div>
               ) : (
                 <>
                   <Shield className="w-4 h-4 mr-2" />
-                  Check BIN
+                  Check BINs
                 </>
               )}
             </Button>
@@ -113,56 +129,58 @@ const BinChecker = () => {
       </Card>
 
       {/* Results Card */}
-      {result && (
+      {results.length > 0 && (
         <Card className="glass neon-border p-6 animate-fade-in">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              {result.valid ? (
-                <CheckCircle className="w-5 h-5 text-primary" />
-              ) : (
-                <XCircle className="w-5 h-5 text-destructive" />
-              )}
-              <h2 className="text-xl font-semibold">BIN Information</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">BIN Results</h2>
+              <Badge variant="secondary">{results.length} checked</Badge>
             </div>
 
             <Separator />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Scheme:</span>
-                  <Badge variant="secondary">{result.scheme}</Badge>
-                </div>
+            <div className="max-h-[400px] overflow-auto space-y-4">
+              {results.map((result, index) => (
+                <div key={index} className="border border-border/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    {result.valid ? (
+                      <CheckCircle className="w-4 h-4 text-primary" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-destructive" />
+                    )}
+                    <span className="font-mono font-semibold">{result.bin}</span>
+                    <Badge variant={result.valid ? 'default' : 'destructive'}>
+                      {result.valid ? 'Valid' : 'Invalid'}
+                    </Badge>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Type:</span>
-                  <Badge variant={result.type === 'CREDIT' ? 'default' : 'outline'}>
-                    {result.type}
-                  </Badge>
-                </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">Scheme:</span>
+                      <Badge variant="secondary" className="text-xs">{result.scheme}</Badge>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Brand:</span>
-                  <span className="font-medium">{result.brand}</span>
-                </div>
-              </div>
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">Type:</span>
+                      <Badge variant="outline" className="text-xs">{result.type}</Badge>
+                    </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Country:</span>
-                  <span className="font-medium">{result.country.name} ({result.country.code})</span>
-                </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">Country:</span>
+                      <span className="font-medium">{result.country.code}</span>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Bank:</span>
-                  <span className="font-medium">{result.bank}</span>
+                    <div className="flex items-center gap-2">
+                      <Building className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">Bank:</span>
+                      <span className="font-medium text-xs">{result.bank}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </Card>

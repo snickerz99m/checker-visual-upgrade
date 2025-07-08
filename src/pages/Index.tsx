@@ -3,9 +3,10 @@ import MatrixBackground from '@/components/MatrixBackground';
 import Header from '@/components/Header';
 import BinChecker from '@/components/BinChecker';
 import CCGenerator from '@/components/CCGenerator';
+import CardChecker from '@/components/CardChecker';
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState('bin-checker');
+  const [activeTab, setActiveTab] = useState('card-checker');
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -17,7 +18,17 @@ const Index = () => {
         <main className="max-w-7xl mx-auto p-6">
           <div className="space-y-8">
             {/* Tab Navigation */}
-            <div className="flex justify-center gap-4">
+            <div className="flex justify-center gap-4 flex-wrap">
+              <button
+                onClick={() => setActiveTab('card-checker')}
+                className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                  activeTab === 'card-checker'
+                    ? 'bg-accent text-accent-foreground cyber-glow'
+                    : 'bg-card text-card-foreground border border-border hover:bg-accent'
+                }`}
+              >
+                CARD CHECKER
+              </button>
               <button
                 onClick={() => setActiveTab('bin-checker')}
                 className={`px-6 py-3 rounded-lg font-medium transition-all ${
@@ -42,7 +53,9 @@ const Index = () => {
 
             {/* Content */}
             <div className="animate-fade-in">
-              {activeTab === 'bin-checker' ? <BinChecker /> : <CCGenerator />}
+              {activeTab === 'card-checker' && <CardChecker />}
+              {activeTab === 'bin-checker' && <BinChecker />}
+              {activeTab === 'cc-gen' && <CCGenerator />}
             </div>
           </div>
         </main>
