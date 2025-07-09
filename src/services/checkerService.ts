@@ -88,17 +88,17 @@ export class CheckerService {
     let completedCount = 0;
     const promises: Promise<void>[] = [];
 
-    // Optimize for heavy workloads - limit max concurrent for stability
+    // Ultra conservative limits to prevent browser crashes
     const maxConcurrent = Math.min(
-      fastMode ? Math.min(threadCount, 20) : threadCount, // Cap fast mode at 20 concurrent
+      fastMode ? 5 : Math.min(threadCount, 3), // Very conservative limits
       cards.length,
-      50 // Hard limit to prevent browser crashes
+      5 // Hard cap at 5 concurrent to prevent crashes
     );
     let currentIndex = 0;
 
-    // Batch progress updates to prevent UI lag
+    // Much larger batch sizes to reduce UI updates
     let progressBatchCount = 0;
-    const PROGRESS_BATCH_SIZE = fastMode ? 10 : 5;
+    const PROGRESS_BATCH_SIZE = Math.max(25, Math.floor(cards.length / 20));
 
     // Function to process a single card
     const processNext = async (): Promise<void> => {
@@ -123,29 +123,27 @@ export class CheckerService {
           progressBatchCount = 0;
         }
 
-        // Adaptive delay based on completion rate and system performance
-        const baseDelay = fastMode ? 50 : settings.requestDelay * 1000;
-        const adaptiveDelay = cards.length > 500 ? Math.max(baseDelay, 100) : baseDelay;
+        // Much longer delays to prevent browser overload
+        const baseDelay = fastMode ? 500 : settings.requestDelay * 1000;
+        const adaptiveDelay = Math.max(baseDelay, cards.length > 100 ? 1000 : 500);
         
-        if (adaptiveDelay > 0) {
-          await new Promise(resolve => 
-            setTimeout(resolve, fastMode ? adaptiveDelay : adaptiveDelay / maxConcurrent)
-          );
-        }
+        await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
 
-        // Memory cleanup for very large lists
-        if (completedCount % 100 === 0 && typeof window !== 'undefined' && window.gc) {
-          window.gc(); // Force garbage collection if available
+        // Aggressive memory management
+        if (completedCount % 10 === 0) {
+          // Force cleanup every 10 requests
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (typeof window !== 'undefined' && window.gc) {
+            window.gc();
+          }
         }
       }
     };
 
-    // Start multiple workers with staggered startup for heavy loads
+    // Start workers with significant staggering to prevent crashes
     for (let i = 0; i < maxConcurrent; i++) {
-      if (cards.length > 200) {
-        // Stagger worker startup for large lists to prevent initial spike
-        await new Promise(resolve => setTimeout(resolve, i * 10));
-      }
+      // Always stagger startup with longer delays
+      await new Promise(resolve => setTimeout(resolve, i * 1000 + 500));
       promises.push(processNext());
     }
 
