@@ -98,6 +98,10 @@ All colors MUST be HSL for Matrix/Cyber aesthetic
 
 @layer base {
   :root {
+    /* Cyber Blue Theme */
+    --cyber-blue: 120 100% 50%;
+    --cyber-green: 120 100% 40%;
+    --cyber-accent: 180 100% 50%;
     /* Dark Cyber Theme */
     --background: 220 15% 8%;
     --foreground: 120 100% 90%;

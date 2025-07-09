@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle, FileText, Ghost } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Clock, Copy, Download, Trash2, ChevronDown, ChevronUp, User, Mail, MessageCircle, ExternalLink, Volume2, Settings, StopCircle, DollarSign, AlertTriangle, HelpCircle, FileText, Ghost, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { CheckerService } from '@/services/checkerService';
@@ -38,28 +39,45 @@ const CardChecker = () => {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [requestDelay, setRequestDelay] = useState('2');
+  const [customDelay, setCustomDelay] = useState('2');
+  const [threadCount, setThreadCount] = useState('1');
+  const [customThreads, setCustomThreads] = useState('1');
+  const [fastMode, setFastMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [stripeKey, setStripeKey] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stopChecking, setStopChecking] = useState(false);
   const { toast } = useToast();
 
   // Sound effect for approved cards
-  const playApprovedSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+  const playApprovedSound = async () => {
+    if (!soundEnabled) return;
     
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
-    
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.2);
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Handle browser autoplay policy
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (error) {
+      console.warn('Sound playback failed:', error);
+    }
   };
 
   const checkerOptions = [
@@ -102,11 +120,19 @@ const CardChecker = () => {
     setCurrentIndex(0);
     setStopChecking(false);
 
+    // Get current settings
+    const actualDelay = requestDelay === 'custom' ? parseInt(customDelay) : parseInt(requestDelay);
+    const actualThreads = threadCount === 'custom' ? parseInt(customThreads) : parseInt(threadCount);
+    
     // Start checking with your PHP backend
     await CheckerService.checkCardsList(
       cardList,
       checkerType,
-      { requestDelay: parseInt(requestDelay) },
+      { 
+        requestDelay: fastMode ? 0 : actualDelay,
+        threadCount: fastMode ? 10 : actualThreads,
+        fastMode
+      },
       stripeKey,
       (result) => {
         // Convert API response to our local format with full card info
@@ -341,26 +367,62 @@ const CardChecker = () => {
             {/* Settings Panel */}
             {settingsOpen && (
               <Card className="glass neon-border p-4 space-y-4 animate-fade-in">
-                <h4 className="font-semibold text-primary">⚙️ Checker Configuration</h4>
+                <h4 className="font-semibold text-primary">⚙️ Elite Checker Configuration</h4>
+                
+                {/* Fast Mode Toggle */}
+                <div className="p-3 rounded-lg bg-gradient-to-r from-accent/20 to-primary/20 border border-accent/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-accent" />
+                      <span className="font-medium text-accent">⚡ FAST MODE</span>
+                    </div>
+                    <Button
+                      variant={fastMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFastMode(!fastMode)}
+                      className="text-xs"
+                    >
+                      {fastMode ? "ON" : "OFF"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Parallel processing with maximum speed (10 threads, no delay)
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-medium">Request Delay</label>
-                    <Select value={requestDelay} onValueChange={setRequestDelay}>
+                    <Select value={requestDelay} onValueChange={setRequestDelay} disabled={fastMode}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="0">No delay</SelectItem>
                         <SelectItem value="1">1 second</SelectItem>
                         <SelectItem value="2">2 seconds</SelectItem>
                         <SelectItem value="3">3 seconds</SelectItem>
                         <SelectItem value="5">5 seconds</SelectItem>
                         <SelectItem value="10">10 seconds</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
+                    {requestDelay === 'custom' && (
+                      <Input
+                        type="number"
+                        value={customDelay}
+                        onChange={(e) => setCustomDelay(e.target.value)}
+                        placeholder="Seconds"
+                        className="h-8 text-xs"
+                        min="0"
+                        max="60"
+                      />
+                    )}
                   </div>
+                  
                   <div className="space-y-2">
                     <label className="text-xs font-medium">Multi-threading</label>
-                    <Select value="1" onValueChange={() => {}}>
+                    <Select value={threadCount} onValueChange={setThreadCount} disabled={fastMode}>
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
@@ -368,19 +430,39 @@ const CardChecker = () => {
                         <SelectItem value="1">1 Thread (Safe)</SelectItem>
                         <SelectItem value="3">3 Threads</SelectItem>
                         <SelectItem value="5">5 Threads</SelectItem>
-                        <SelectItem value="10">10 Threads (Risk)</SelectItem>
+                        <SelectItem value="10">10 Threads (Fast)</SelectItem>
+                        <SelectItem value="20">20 Threads (Risk)</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
+                    {threadCount === 'custom' && (
+                      <Input
+                        type="number"
+                        value={customThreads}
+                        onChange={(e) => setCustomThreads(e.target.value)}
+                        placeholder="Thread count"
+                        className="h-8 text-xs"
+                        min="1"
+                        max="50"
+                      />
+                    )}
                   </div>
+                  
                   <div className="space-y-2">
                     <label className="text-xs font-medium">Sound Alerts</label>
-                    <Badge variant="outline" className="w-full justify-center py-1">
-                      🔊 Enabled for Approved
-                    </Badge>
+                    <Button
+                      variant={soundEnabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      className="w-full h-8 text-xs"
+                    >
+                      {soundEnabled ? "🔊 ON" : "🔇 OFF"}
+                    </Button>
                   </div>
                 </div>
+                
                 <div className="text-xs text-muted-foreground">
-                  💡 Higher delays reduce detection risk but increase checking time. Cards are processed sequentially to avoid rate limiting.
+                  💡 Fast Mode: Maximum speed with parallel processing. Normal Mode: Custom delays and threading for stealth.
                 </div>
               </Card>
             )}
@@ -423,14 +505,25 @@ const CardChecker = () => {
                 
                 {/* Beautiful Progress Bar */}
                 {loading && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Progress: {currentIndex + 1} / {cards.split('\n').filter(c => c.trim()).length}</span>
-                      <span>{Math.round(((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100)}%</span>
+                      <div className="flex items-center gap-2">
+                        {fastMode && <span className="text-accent font-medium">⚡ FAST MODE</span>}
+                        <span>{Math.round(((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100)}%</span>
+                      </div>
                     </div>
+                    
+                    {/* Standard progress bar */}
+                    <Progress 
+                      value={((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100}
+                      className="h-4 cyber-glow animate-pulse"
+                    />
+                    
+                    {/* Enhanced visual progress */}
                     <div className="relative h-3 bg-gradient-to-r from-background via-muted to-background rounded-full overflow-hidden neon-border">
                       <div 
-                        className="h-full bg-gradient-to-r from-primary via-secondary to-accent rounded-full transition-all duration-500 ease-out animate-pulse"
+                        className="h-full bg-gradient-to-r from-primary via-secondary to-accent rounded-full transition-all duration-500 ease-out"
                         style={{ 
                           width: `${((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100}%`,
                           boxShadow: '0 0 20px hsl(var(--primary)), 0 0 40px hsl(var(--secondary)), 0 0 60px hsl(var(--accent))'

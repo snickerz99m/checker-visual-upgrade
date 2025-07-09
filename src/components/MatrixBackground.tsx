@@ -14,26 +14,29 @@ const MatrixBackground = () => {
       char.className = 'matrix-char';
       char.textContent = characters[Math.floor(Math.random() * characters.length)];
       char.style.left = Math.random() * 100 + '%';
-      char.style.animationDuration = (Math.random() * 3 + 2) + 's';
-      char.style.opacity = (Math.random() * 0.8 + 0.2).toString();
-      char.style.fontSize = Math.random() * 10 + 12 + 'px';
+      char.style.animationDuration = (Math.random() * 4 + 3) + 's';
+      char.style.opacity = (Math.random() * 0.9 + 0.3).toString();
+      char.style.fontSize = Math.random() * 8 + 14 + 'px';
+      char.style.color = `hsl(${120 + Math.random() * 60}, 100%, ${40 + Math.random() * 30}%)`;
+      char.style.textShadow = `0 0 5px currentColor, 0 0 10px currentColor`;
+      char.style.fontWeight = Math.random() > 0.7 ? 'bold' : 'normal';
       
       container.appendChild(char);
 
       // Remove character after animation
       setTimeout(() => {
-        if (container.contains(char)) {
+        if (container && container.contains(char)) {
           container.removeChild(char);
         }
-      }, 5000);
+      }, 7000);
     };
 
     // Create initial characters more frequently  
-    const interval = setInterval(createMatrixChar, 50);
+    const interval = setInterval(createMatrixChar, 80);
 
     // Start immediately with multiple characters
-    for (let i = 0; i < 5; i++) {
-      setTimeout(createMatrixChar, i * 100);
+    for (let i = 0; i < 15; i++) {
+      setTimeout(createMatrixChar, i * 50);
     }
 
     return () => {
