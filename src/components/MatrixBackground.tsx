@@ -28,11 +28,13 @@ const MatrixBackground = () => {
       }, 5000);
     };
 
-    // Create initial characters more frequently
-    const interval = setInterval(createMatrixChar, 80);
+    // Create initial characters more frequently  
+    const interval = setInterval(createMatrixChar, 50);
 
-    // Start immediately
-    createMatrixChar();
+    // Start immediately with multiple characters
+    for (let i = 0; i < 5; i++) {
+      setTimeout(createMatrixChar, i * 100);
+    }
 
     return () => {
       clearInterval(interval);

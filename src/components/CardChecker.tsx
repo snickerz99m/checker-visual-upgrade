@@ -401,11 +401,11 @@ const CardChecker = () => {
                 />
               </div>
 
-              <div className="flex gap-4">
+              <div className="space-y-3">
                 <Button
                   onClick={checkCards}
                   disabled={loading || !cards.trim()}
-                  className="flex-1 cyber-glow"
+                  className="w-full cyber-glow"
                   size="lg"
                 >
                   {loading ? (
@@ -420,6 +420,26 @@ const CardChecker = () => {
                     </>
                   )}
                 </Button>
+                
+                {/* Beautiful Progress Bar */}
+                {loading && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Progress: {currentIndex + 1} / {cards.split('\n').filter(c => c.trim()).length}</span>
+                      <span>{Math.round(((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100)}%</span>
+                    </div>
+                    <div className="relative h-3 bg-gradient-to-r from-background via-muted to-background rounded-full overflow-hidden neon-border">
+                      <div 
+                        className="h-full bg-gradient-to-r from-primary via-secondary to-accent rounded-full transition-all duration-500 ease-out animate-pulse"
+                        style={{ 
+                          width: `${((currentIndex + 1) / cards.split('\n').filter(c => c.trim()).length) * 100}%`,
+                          boxShadow: '0 0 20px hsl(var(--primary)), 0 0 40px hsl(var(--secondary)), 0 0 60px hsl(var(--accent))'
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Live Stats Dashboard */}

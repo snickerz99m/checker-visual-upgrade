@@ -37,6 +37,16 @@ All colors MUST be HSL for Matrix/Cyber aesthetic
   }
 }
 
+/* Shimmer effect for progress bar */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
 /* Glitch Effects */
 .glitch-text {
   animation: glitch 2s infinite;

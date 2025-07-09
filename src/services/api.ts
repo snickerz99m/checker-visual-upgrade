@@ -3,7 +3,14 @@ export const API_CONFIG = {
   // Change these URLs to your PHP backend endpoints
   baseUrl: 'https://your-php-backend.com/api', // Replace with your domain
   endpoints: {
-    cardChecker: '/card-checker.php',
+    // Separate PHP files for each checker
+    stripe: '/stripe-checker.php',
+    stripe_sk: '/stripe-sk-checker.php', 
+    paypal: '/paypal-checker.php',
+    square: '/square-checker.php',
+    braintree: '/braintree-checker.php',
+    authorize: '/authorize-checker.php',
+    shopify: '/shopify-checker.php',
     binChecker: '/bin-checker.php',
     ccGenerator: '/cc-generator.php'
   },
@@ -44,7 +51,7 @@ export class ApiService {
     }
   }
 
-  // Card Checker API
+  // Card Checker API - Routes to specific PHP files
   static async checkCard(cardData: {
     cardNumber: string;
     expiry: string;
@@ -53,7 +60,12 @@ export class ApiService {
     settings: any;
     stripeKey?: string;
   }) {
-    return this.makeRequest(API_CONFIG.endpoints.cardChecker, cardData);
+    // Route to specific checker PHP file based on type
+    const endpoint = API_CONFIG.endpoints[cardData.checkerType as keyof typeof API_CONFIG.endpoints];
+    if (!endpoint) {
+      throw new Error(`Unknown checker type: ${cardData.checkerType}`);
+    }
+    return this.makeRequest(endpoint, cardData);
   }
 
   // BIN Checker API
