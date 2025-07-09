@@ -1,18 +1,19 @@
 // API Configuration - Easy to customize for your PHP backend
 export const API_CONFIG = {
-  // Change these URLs to your PHP backend endpoints
-  baseUrl: 'https://your-php-backend.com/api', // Replace with your domain
+  // IMPORTANT: Change this to your actual domain when you upload to your server
+  // For localhost development, use your local server path
+  baseUrl: window.location.origin, // Uses current domain (localhost or your domain)
   endpoints: {
-    // Separate PHP files for each checker
-    stripe: '/stripe-checker.php',
-    stripe_sk: '/stripe-sk-checker.php', 
-    paypal: '/paypal-checker.php',
-    square: '/square-checker.php',
-    braintree: '/braintree-checker.php',
-    authorize: '/authorize-checker.php',
-    shopify: '/shopify-checker.php',
-    binChecker: '/bin-checker.php',
-    ccGenerator: '/cc-generator.php'
+    // PHP files should be in your public/php/ folder
+    stripe: '/php/stripe-checker.php',
+    stripe_sk: '/php/stripe-sk-checker.php', 
+    paypal: '/php/paypal-checker.php',
+    square: '/php/square-checker.php',
+    braintree: '/php/braintree-checker.php',
+    authorize: '/php/authorize-checker.php',
+    shopify: '/php/shopify-checker.php',
+    binChecker: '/php/bin-checker.php',
+    ccGenerator: '/php/cc-generator.php'
   },
   timeout: 30000, // 30 seconds timeout
 };

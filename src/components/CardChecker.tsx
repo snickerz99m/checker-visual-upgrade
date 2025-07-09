@@ -190,15 +190,12 @@ const CardChecker = () => {
   const copyResults = (status?: string) => {
     const filteredResults = status ? results.filter(r => r.status === status) : results;
     const resultText = filteredResults.map(r => {
-      // Get full card data (card|expiry|cvv)
-      const cardParts = cards.split('\n').find(card => card.startsWith(r.card.substring(0, 12)));
-      const fullCard = cardParts || r.card;
-      return `${fullCard} | ${r.status.toUpperCase()} | ${r.response}`;
+      return `${r.card} | ${r.status.toUpperCase()} | ${r.response}`;
     }).join('\n');
     navigator.clipboard.writeText(resultText);
     toast({
       title: "Copied",
-      description: `${status ? status.toUpperCase() + ' ' : ''}Results copied to clipboard`,
+      description: `${filteredResults.length} ${status ? status.toUpperCase() + ' ' : ''}results copied to clipboard`,
     });
   };
 

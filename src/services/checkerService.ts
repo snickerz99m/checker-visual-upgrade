@@ -84,40 +84,46 @@ export class CheckerService {
     onResult?: (result: CardCheckResponse & { index: number }) => void,
     onProgress?: (current: number, total: number) => void
   ) {
-    const { threadCount = 10 } = settings;
-    const chunkSize = Math.ceil(cards.length / threadCount);
-    const chunks: string[][] = [];
-    
-    // Split cards into chunks for parallel processing
-    for (let i = 0; i < cards.length; i += chunkSize) {
-      chunks.push(cards.slice(i, i + chunkSize));
-    }
-
+    const { threadCount = 10, fastMode } = settings;
     let completedCount = 0;
+    const promises: Promise<void>[] = [];
 
-    // Process chunks in parallel
-    const promises = chunks.map(async (chunk, chunkIndex) => {
-      for (let i = 0; i < chunk.length; i++) {
-        if (!this.isRunning || this.abortController?.signal.aborted) {
-          break;
+    // Create semaphore to limit concurrent requests
+    const maxConcurrent = Math.min(threadCount, cards.length);
+    let currentIndex = 0;
+
+    // Function to process a single card
+    const processNext = async (): Promise<void> => {
+      while (currentIndex < cards.length && this.isRunning && !this.abortController?.signal.aborted) {
+        const index = currentIndex++;
+        const card = cards[index];
+        
+        try {
+          await this.processCard(index, card, checkerType, settings, stripeKey, onResult);
+        } catch (error) {
+          console.error(`Error processing card at index ${index}:`, error);
         }
-
-        const cardIndex = chunkIndex * chunkSize + i;
-        await this.processCard(cardIndex, chunk[i], checkerType, settings, stripeKey, onResult);
         
         completedCount++;
         if (onProgress) {
           onProgress(completedCount, cards.length);
         }
 
-        // Small delay even in fast mode to prevent overwhelming the server
-        if (!settings.fastMode && settings.requestDelay) {
+        // Add small delay in fast mode to prevent overwhelming server
+        if (fastMode) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms between requests
+        } else if (settings.requestDelay) {
           await new Promise(resolve => 
-            setTimeout(resolve, settings.requestDelay * 1000 / threadCount)
+            setTimeout(resolve, (settings.requestDelay * 1000) / maxConcurrent)
           );
         }
       }
-    });
+    };
+
+    // Start multiple workers
+    for (let i = 0; i < maxConcurrent; i++) {
+      promises.push(processNext());
+    }
 
     await Promise.all(promises);
   }
@@ -138,15 +144,34 @@ export class CheckerService {
     if (!cardNumber) return;
 
     try {
-      // Call your PHP backend
-      const result = await ApiService.checkCard({
-        cardNumber,
-        expiry,
-        cvv,
-        checkerType,
-        settings,
-        stripeKey
-      });
+      // For localhost testing, simulate response if PHP backend not available
+      let result: CardCheckResponse;
+      
+      try {
+        // Call your PHP backend
+        result = await ApiService.checkCard({
+          cardNumber,
+          expiry,
+          cvv,
+          checkerType,
+          settings,
+          stripeKey
+        });
+      } catch (error) {
+        // Fallback for localhost testing when PHP backend is not available
+        console.warn('PHP backend not available, using test response:', error);
+        result = {
+          status: Math.random() > 0.7 ? 'approved' : Math.random() > 0.5 ? 'declined' : 'ccn',
+          message: 'Test response - configure your PHP backend',
+          cardNumber,
+          bin: cardNumber.substring(0, 6),
+          brand: 'VISA',
+          country: 'US'
+        };
+        
+        // Simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+      }
 
       // Notify parent component of result
       if (onResult) {
