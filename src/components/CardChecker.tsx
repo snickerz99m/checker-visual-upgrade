@@ -73,6 +73,9 @@ const CardChecker = () => {
   ];
 
   const checkCards = async () => {
+    // Prevent double execution
+    if (loading) return;
+    
     const cardList = cards.split('\n').filter(card => card.trim().length > 0);
     
     if (cardList.length === 0) {
@@ -106,9 +109,10 @@ const CardChecker = () => {
       { requestDelay: parseInt(requestDelay) },
       stripeKey,
       (result) => {
-        // Convert API response to our local format
+        // Convert API response to our local format with full card info
+        const fullCard = cardList[result.index] || result.cardNumber;
         const localResult: CheckResult = {
-          card: result.cardNumber,
+          card: fullCard, // Store full card|expiry|cvv format
           status: result.status === 'approved' ? 'live' : 
                   result.status === 'declined' ? 'dead' :
                   result.status === 'ccn' ? 'unknown' :
@@ -159,9 +163,12 @@ const CardChecker = () => {
 
   const copyResults = (status?: string) => {
     const filteredResults = status ? results.filter(r => r.status === status) : results;
-    const resultText = filteredResults.map(r => 
-      `${r.card} | ${r.status.toUpperCase()} | ${r.response}`
-    ).join('\n');
+    const resultText = filteredResults.map(r => {
+      // Get full card data (card|expiry|cvv)
+      const cardParts = cards.split('\n').find(card => card.startsWith(r.card.substring(0, 12)));
+      const fullCard = cardParts || r.card;
+      return `${fullCard} | ${r.status.toUpperCase()} | ${r.response}`;
+    }).join('\n');
     navigator.clipboard.writeText(resultText);
     toast({
       title: "Copied",
