@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,6 +48,28 @@ const CardChecker = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stopChecking, setStopChecking] = useState(false);
   const { toast } = useToast();
+
+  // Performance optimization: batch state updates to prevent excessive re-renders
+  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const pendingResultsRef = useRef<Map<number, CheckResult>>(new Map());
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      pendingResultsRef.current.clear();
+      CheckerService.stopChecking();
+    };
+  }, []);
+
+  // Memory management for large result sets
+  useEffect(() => {
+    if (results.length > 1000) {
+      console.warn('Large result set detected. Consider clearing old results for better performance.');
+    }
+  }, [results.length]);
 
   // Sound effect for approved cards
   const playApprovedSound = async () => {
@@ -150,16 +172,30 @@ const CardChecker = () => {
           bank: result.bank
         };
 
-        setResults(prev => {
-          const updated = [...prev];
-          updated[result.index] = localResult;
-          
-          // Play sound if card is approved
-          if (localResult.status === 'live') {
-            setTimeout(() => playApprovedSound(), 100);
-          }
-          return updated;
-        });
+        // Batch updates to prevent excessive re-renders with large lists
+        pendingResultsRef.current.set(result.index, localResult);
+        
+        // Clear existing timeout and set a new one
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
+        
+        updateTimeoutRef.current = setTimeout(() => {
+          setResults(prev => {
+            const updated = [...prev];
+            // Apply all pending updates at once
+            pendingResultsRef.current.forEach((res, idx) => {
+              updated[idx] = res;
+            });
+            pendingResultsRef.current.clear();
+            return updated;
+          });
+        }, 50); // Batch updates every 50ms for smooth performance
+
+        // Play sound if card is approved (don't batch this)
+        if (localResult.status === 'live') {
+          setTimeout(() => playApprovedSound(), 100);
+        }
       },
       (current, total) => {
         setCurrentIndex(current - 1);
@@ -225,12 +261,28 @@ const CardChecker = () => {
     });
   };
 
-  const approvedCards = results.filter(r => r.status === 'live');
-  const declinedCards = results.filter(r => r.status === 'dead');
-  const unknownCards = results.filter(r => r.status === 'unknown');
-  const insufficientCards = results.filter(r => r.status === 'insufficient');
-  const unknownDeclineCards = results.filter(r => r.status === 'unknown_decline');
-  const errorCards = results.filter(r => r.status === 'error');
+  // Memoize filtered results to prevent unnecessary recalculations
+  const filteredResults = useMemo(() => {
+    const approved = results.filter(r => r.status === 'live');
+    const declined = results.filter(r => r.status === 'dead');
+    const unknown = results.filter(r => r.status === 'unknown');
+    const insufficient = results.filter(r => r.status === 'insufficient');
+    const unknownDecline = results.filter(r => r.status === 'unknown_decline');
+    const errors = results.filter(r => r.status === 'error');
+    
+    return {
+      approved,
+      declined,
+      unknown,
+      insufficient,
+      unknownDecline,
+      errors
+    };
+  }, [results]);
+
+  const { approved: approvedCards, declined: declinedCards, unknown: unknownCards, 
+          insufficient: insufficientCards, unknownDecline: unknownDeclineCards, 
+          errors: errorCards } = filteredResults;
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
@@ -622,19 +674,24 @@ const CardChecker = () => {
                     {approvedCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No approved cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {approvedCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-primary/10 border border-primary/20">
-                            <div className="flex justify-between items-start">
-                              <span className="text-primary font-medium">{result.card}</span>
-                              <Badge variant="default" className="text-xs">LIVE</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {approvedCards.slice(0, 50).map((result, index) => (
+                           <div key={`approved-${index}`} className="font-mono text-sm p-2 rounded bg-primary/10 border border-primary/20">
+                             <div className="flex justify-between items-start">
+                               <span className="text-primary font-medium">{result.card}</span>
+                               <Badge variant="default" className="text-xs">LIVE</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {approvedCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {approvedCards.length} approved cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>
@@ -694,19 +751,24 @@ const CardChecker = () => {
                     {unknownCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No CCN cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {unknownCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-muted/10 border border-muted/20">
-                            <div className="flex justify-between items-start">
-                              <span>{result.card}</span>
-                              <Badge variant="secondary" className="text-xs">CCN</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {unknownCards.slice(0, 50).map((result, index) => (
+                           <div key={`unknown-${index}`} className="font-mono text-sm p-2 rounded bg-muted/10 border border-muted/20">
+                             <div className="flex justify-between items-start">
+                               <span>{result.card}</span>
+                               <Badge variant="secondary" className="text-xs">CCN</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {unknownCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {unknownCards.length} CCN cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>
@@ -766,19 +828,24 @@ const CardChecker = () => {
                     {declinedCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No declined cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {declinedCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-destructive/10 border border-destructive/20">
-                            <div className="flex justify-between items-start">
-                              <span>{result.card}</span>
-                              <Badge variant="destructive" className="text-xs">DEAD</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {declinedCards.slice(0, 50).map((result, index) => (
+                           <div key={`declined-${index}`} className="font-mono text-sm p-2 rounded bg-destructive/10 border border-destructive/20">
+                             <div className="flex justify-between items-start">
+                               <span>{result.card}</span>
+                               <Badge variant="destructive" className="text-xs">DEAD</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {declinedCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {declinedCards.length} declined cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>
@@ -838,19 +905,24 @@ const CardChecker = () => {
                     {insufficientCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No insufficient cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {insufficientCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-orange-500/10 border border-orange-500/20">
-                            <div className="flex justify-between items-start">
-                              <span>{result.card}</span>
-                              <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">INSUFFICIENT</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {insufficientCards.slice(0, 50).map((result, index) => (
+                           <div key={`insufficient-${index}`} className="font-mono text-sm p-2 rounded bg-orange-500/10 border border-orange-500/20">
+                             <div className="flex justify-between items-start">
+                               <span>{result.card}</span>
+                               <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">INSUFFICIENT</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {insufficientCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {insufficientCards.length} insufficient cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>
@@ -910,19 +982,24 @@ const CardChecker = () => {
                     {unknownDeclineCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No unknown decline cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {unknownDeclineCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-purple-500/10 border border-purple-500/20">
-                            <div className="flex justify-between items-start">
-                              <span>{result.card}</span>
-                              <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">UNK DECLINE</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {unknownDeclineCards.slice(0, 50).map((result, index) => (
+                           <div key={`unknown-decline-${index}`} className="font-mono text-sm p-2 rounded bg-purple-500/10 border border-purple-500/20">
+                             <div className="flex justify-between items-start">
+                               <span>{result.card}</span>
+                               <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-400">UNK DECLINE</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {unknownDeclineCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {unknownDeclineCards.length} unknown decline cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>
@@ -982,19 +1059,24 @@ const CardChecker = () => {
                     {errorCards.length === 0 ? (
                       <p className="text-muted-foreground text-center py-8">No error cards yet</p>
                     ) : (
-                      <div className="space-y-2">
-                        {errorCards.map((result, index) => (
-                          <div key={index} className="font-mono text-sm p-2 rounded bg-red-500/10 border border-red-500/20">
-                            <div className="flex justify-between items-start">
-                              <span>{result.card}</span>
-                              <Badge variant="secondary" className="text-xs bg-red-500/20 text-red-400">ERROR</Badge>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {result.response} • {result.brand} • {result.country}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                       <div className="space-y-2">
+                         {errorCards.slice(0, 50).map((result, index) => (
+                           <div key={`error-${index}`} className="font-mono text-sm p-2 rounded bg-red-500/10 border border-red-500/20">
+                             <div className="flex justify-between items-start">
+                               <span>{result.card}</span>
+                               <Badge variant="secondary" className="text-xs bg-red-500/20 text-red-400">ERROR</Badge>
+                             </div>
+                             <div className="text-xs text-muted-foreground mt-1">
+                               {result.response} • {result.brand} • {result.country}
+                             </div>
+                           </div>
+                         ))}
+                         {errorCards.length > 50 && (
+                           <div className="text-center py-2 text-xs text-muted-foreground">
+                             Showing first 50 of {errorCards.length} error cards. Download all results to see more.
+                           </div>
+                         )}
+                       </div>
                     )}
                   </div>
                 </CollapsibleContent>

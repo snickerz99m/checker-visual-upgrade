@@ -88,9 +88,17 @@ export class CheckerService {
     let completedCount = 0;
     const promises: Promise<void>[] = [];
 
-    // Create semaphore to limit concurrent requests
-    const maxConcurrent = Math.min(threadCount, cards.length);
+    // Optimize for heavy workloads - limit max concurrent for stability
+    const maxConcurrent = Math.min(
+      fastMode ? Math.min(threadCount, 20) : threadCount, // Cap fast mode at 20 concurrent
+      cards.length,
+      50 // Hard limit to prevent browser crashes
+    );
     let currentIndex = 0;
+
+    // Batch progress updates to prevent UI lag
+    let progressBatchCount = 0;
+    const PROGRESS_BATCH_SIZE = fastMode ? 10 : 5;
 
     // Function to process a single card
     const processNext = async (): Promise<void> => {
@@ -105,23 +113,39 @@ export class CheckerService {
         }
         
         completedCount++;
-        if (onProgress) {
-          onProgress(completedCount, cards.length);
+        progressBatchCount++;
+        
+        // Batch progress updates for performance
+        if (progressBatchCount >= PROGRESS_BATCH_SIZE || completedCount === cards.length) {
+          if (onProgress) {
+            onProgress(completedCount, cards.length);
+          }
+          progressBatchCount = 0;
         }
 
-        // Add small delay in fast mode to prevent overwhelming server
-        if (fastMode) {
-          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms between requests
-        } else if (settings.requestDelay) {
+        // Adaptive delay based on completion rate and system performance
+        const baseDelay = fastMode ? 50 : settings.requestDelay * 1000;
+        const adaptiveDelay = cards.length > 500 ? Math.max(baseDelay, 100) : baseDelay;
+        
+        if (adaptiveDelay > 0) {
           await new Promise(resolve => 
-            setTimeout(resolve, (settings.requestDelay * 1000) / maxConcurrent)
+            setTimeout(resolve, fastMode ? adaptiveDelay : adaptiveDelay / maxConcurrent)
           );
+        }
+
+        // Memory cleanup for very large lists
+        if (completedCount % 100 === 0 && typeof window !== 'undefined' && window.gc) {
+          window.gc(); // Force garbage collection if available
         }
       }
     };
 
-    // Start multiple workers
+    // Start multiple workers with staggered startup for heavy loads
     for (let i = 0; i < maxConcurrent; i++) {
+      if (cards.length > 200) {
+        // Stagger worker startup for large lists to prevent initial spike
+        await new Promise(resolve => setTimeout(resolve, i * 10));
+      }
       promises.push(processNext());
     }
 
