@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Download, Upload, Save, Code, Settings, FileText, Zap, ArrowLeft } from 'lucide-react';
+import { Plus, Edit, Trash2, Download, Upload, Save, Code, Settings, FileText, Zap, ArrowLeft, Copy, Eye, MoreHorizontal, Trash, CheckSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CHECKER_CONFIGS, CHECKER_CATEGORIES, CheckerConfig } from '@/config/checkers';
 
@@ -36,21 +37,50 @@ const AdminPanel = () => {
   const [selectedFile, setSelectedFile] = useState<PHPFile | null>(null);
   const [phpCode, setPHPCode] = useState('');
   const [isEditingPHP, setIsEditingPHP] = useState(false);
+  const [selectedCheckers, setSelectedCheckers] = useState<string[]>([]);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Load saved data from localStorage
   useEffect(() => {
     const savedCheckers = localStorage.getItem('customCheckers');
     const savedPHPFiles = localStorage.getItem('phpFiles');
+    const hiddenBuiltIns = localStorage.getItem('hiddenBuiltInCheckers');
+    const checkerOverrides = localStorage.getItem('checkerOverrides');
     
+    let allCheckers = [...CHECKER_CONFIGS];
+    
+    // Add custom checkers
     if (savedCheckers) {
       try {
         const custom = JSON.parse(savedCheckers);
-        setCheckers([...CHECKER_CONFIGS, ...custom]);
+        allCheckers = [...allCheckers, ...custom];
       } catch (error) {
         console.error('Error loading saved checkers:', error);
       }
     }
+    
+    // Remove hidden built-in checkers
+    if (hiddenBuiltIns) {
+      try {
+        const hidden = JSON.parse(hiddenBuiltIns);
+        allCheckers = allCheckers.filter(c => !hidden.includes(c.value));
+      } catch (error) {
+        console.error('Error loading hidden checkers:', error);
+      }
+    }
+    
+    // Apply overrides to built-in checkers
+    if (checkerOverrides) {
+      try {
+        const overrides = JSON.parse(checkerOverrides);
+        allCheckers = allCheckers.map(c => overrides[c.value] || c);
+      } catch (error) {
+        console.error('Error loading checker overrides:', error);
+      }
+    }
+    
+    setCheckers(allCheckers);
     
     if (savedPHPFiles) {
       try {
@@ -239,24 +269,152 @@ function determineBrand($cardNumber) {
     });
   };
 
-  // Delete checker
+  // Delete checker (works for both built-in and custom)
   const deleteChecker = (checkerValue: string) => {
-    const updatedCheckers = checkers.filter(c => c.value !== checkerValue);
-    setCheckers(updatedCheckers);
+    const isBuiltIn = CHECKER_CONFIGS.some(c => c.value === checkerValue);
+    
+    if (isBuiltIn) {
+      // For built-in checkers, remove from display list only
+      const updatedCheckers = checkers.filter(c => c.value !== checkerValue);
+      setCheckers(updatedCheckers);
+      
+      // Save hidden built-in checkers
+      const hiddenBuiltIns = CHECKER_CONFIGS.filter(c => !updatedCheckers.includes(c)).map(c => c.value);
+      localStorage.setItem('hiddenBuiltInCheckers', JSON.stringify(hiddenBuiltIns));
+      
+      toast({
+        title: "Success",
+        description: "Built-in checker hidden from interface",
+      });
+    } else {
+      // For custom checkers, permanently delete
+      const updatedCheckers = checkers.filter(c => c.value !== checkerValue);
+      setCheckers(updatedCheckers);
 
-    // Update localStorage
-    const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
-    localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
+      // Update localStorage
+      const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
+      localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
 
-    // Delete associated PHP file
-    const updatedPHPFiles = phpFiles.filter(f => f.filename !== checkerValue);
-    setPHPFiles(updatedPHPFiles);
-    localStorage.setItem('phpFiles', JSON.stringify(updatedPHPFiles));
+      // Delete associated PHP file
+      const updatedPHPFiles = phpFiles.filter(f => f.filename !== checkerValue);
+      setPHPFiles(updatedPHPFiles);
+      localStorage.setItem('phpFiles', JSON.stringify(updatedPHPFiles));
+
+      toast({
+        title: "Success",
+        description: "Custom checker and PHP file deleted permanently",
+      });
+    }
+  };
+
+  // Edit checker
+  const editChecker = (checker: CheckerConfig) => {
+    setEditingChecker(checker);
+    setIsEditDialogOpen(true);
+  };
+
+  // Save edited checker
+  const saveEditedChecker = () => {
+    if (!editingChecker) return;
+
+    const isBuiltIn = CHECKER_CONFIGS.some(c => c.value === editingChecker.value);
+    
+    if (isBuiltIn) {
+      // For built-in checkers, save as override
+      const customOverrides = JSON.parse(localStorage.getItem('checkerOverrides') || '{}');
+      customOverrides[editingChecker.value] = editingChecker;
+      localStorage.setItem('checkerOverrides', JSON.stringify(customOverrides));
+      
+      // Update display
+      const updatedCheckers = checkers.map(c => 
+        c.value === editingChecker.value ? editingChecker : c
+      );
+      setCheckers(updatedCheckers);
+    } else {
+      // For custom checkers, update normally
+      const updatedCheckers = checkers.map(c => 
+        c.value === editingChecker.value ? editingChecker : c
+      );
+      setCheckers(updatedCheckers);
+
+      const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
+      localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
+    }
+
+    setIsEditDialogOpen(false);
+    setEditingChecker(null);
 
     toast({
       title: "Success",
-      description: "Checker and PHP file deleted successfully",
+      description: "Checker updated successfully",
     });
+  };
+
+  // Duplicate checker
+  const duplicateChecker = (checker: CheckerConfig) => {
+    const newValue = `${checker.value.replace('.php', '')}-copy.php`;
+    const newChecker: CheckerConfig = {
+      ...checker,
+      value: newValue,
+      label: `${checker.label} (Copy)`
+    };
+
+    const updatedCheckers = [...checkers, newChecker];
+    setCheckers(updatedCheckers);
+
+    // Save as custom checker
+    const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
+    localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
+
+    // Create PHP file if original exists
+    const originalPHP = phpFiles.find(f => f.filename === checker.value);
+    if (originalPHP) {
+      const newPHPFile: PHPFile = {
+        filename: newValue,
+        content: originalPHP.content,
+        lastModified: new Date()
+      };
+      
+      const updatedPHPFiles = [...phpFiles, newPHPFile];
+      setPHPFiles(updatedPHPFiles);
+      localStorage.setItem('phpFiles', JSON.stringify(updatedPHPFiles));
+    }
+
+    toast({
+      title: "Success",
+      description: "Checker duplicated successfully",
+    });
+  };
+
+  // Bulk delete selected checkers
+  const bulkDeleteCheckers = () => {
+    selectedCheckers.forEach(checkerValue => {
+      deleteChecker(checkerValue);
+    });
+    setSelectedCheckers([]);
+    
+    toast({
+      title: "Success",
+      description: `Deleted ${selectedCheckers.length} checkers`,
+    });
+  };
+
+  // Toggle checker selection
+  const toggleCheckerSelection = (checkerValue: string) => {
+    setSelectedCheckers(prev => 
+      prev.includes(checkerValue)
+        ? prev.filter(v => v !== checkerValue)
+        : [...prev, checkerValue]
+    );
+  };
+
+  // Select all checkers
+  const selectAllCheckers = () => {
+    if (selectedCheckers.length === checkers.length) {
+      setSelectedCheckers([]);
+    } else {
+      setSelectedCheckers(checkers.map(c => c.value));
+    }
   };
 
   // Edit PHP file
@@ -421,13 +579,56 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
             {/* Existing Checkers */}
             <Card className="glass neon-border">
               <CardHeader>
-                <CardTitle className="text-white">Existing Checkers ({checkers.length})</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-white">Existing Checkers ({checkers.length})</CardTitle>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={selectAllCheckers}
+                      className="cyber-glow"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-2" />
+                      {selectedCheckers.length === checkers.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                    {selectedCheckers.length > 0 && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="destructive">
+                            <Trash className="w-4 h-4 mr-2" />
+                            Delete Selected ({selectedCheckers.length})
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="glass neon-border">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Selected Checkers?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete {selectedCheckers.length} checkers. Built-in checkers will be hidden, custom checkers will be permanently deleted.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={bulkDeleteCheckers}>
+                              Delete Selected
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="text-white w-12">
+                          <Checkbox 
+                            checked={selectedCheckers.length === checkers.length}
+                            onCheckedChange={selectAllCheckers}
+                          />
+                        </TableHead>
                         <TableHead className="text-white">Filename</TableHead>
                         <TableHead className="text-white">Display Name</TableHead>
                         <TableHead className="text-white">Category</TableHead>
@@ -436,19 +637,46 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {checkers.map((checker) => (
-                        <TableRow key={checker.value}>
-                          <TableCell className="text-white font-mono">{checker.value}</TableCell>
-                          <TableCell className="text-white">{checker.label}</TableCell>
-                          <TableCell className="text-white">{checker.category}</TableCell>
-                          <TableCell>
-                            <Badge variant={CHECKER_CONFIGS.includes(checker) ? "default" : "secondary"}>
-                              {CHECKER_CONFIGS.includes(checker) ? "Built-in" : "Custom"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              {!CHECKER_CONFIGS.includes(checker) && (
+                      {checkers.map((checker) => {
+                        const isBuiltIn = CHECKER_CONFIGS.some(c => c.value === checker.value);
+                        const isSelected = selectedCheckers.includes(checker.value);
+                        
+                        return (
+                          <TableRow key={checker.value}>
+                            <TableCell>
+                              <Checkbox 
+                                checked={isSelected}
+                                onCheckedChange={() => toggleCheckerSelection(checker.value)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-white font-mono">{checker.value}</TableCell>
+                            <TableCell className="text-white">{checker.label}</TableCell>
+                            <TableCell className="text-white">{checker.category}</TableCell>
+                            <TableCell>
+                              <Badge variant={isBuiltIn ? "default" : "secondary"}>
+                                {isBuiltIn ? "Built-in" : "Custom"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => editChecker(checker)}
+                                  className="cyber-glow"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => duplicateChecker(checker)}
+                                  className="cyber-glow"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button size="sm" variant="destructive">
@@ -457,24 +685,29 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                                   </AlertDialogTrigger>
                                   <AlertDialogContent className="glass neon-border">
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Checker?</AlertDialogTitle>
+                                      <AlertDialogTitle>
+                                        {isBuiltIn ? 'Hide Built-in Checker?' : 'Delete Custom Checker?'}
+                                      </AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will permanently delete the checker and its PHP file. This action cannot be undone.
+                                        {isBuiltIn 
+                                          ? 'This will hide the built-in checker from the interface. You can restore it later.' 
+                                          : 'This will permanently delete the custom checker and its PHP file. This action cannot be undone.'
+                                        }
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                                       <AlertDialogAction onClick={() => deleteChecker(checker.value)}>
-                                        Delete
+                                        {isBuiltIn ? 'Hide' : 'Delete'}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -602,6 +835,82 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Edit Checker Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="glass neon-border max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-white">Edit Checker</DialogTitle>
+              <DialogDescription>
+                {editingChecker && CHECKER_CONFIGS.some(c => c.value === editingChecker.value)
+                  ? 'Editing a built-in checker will create an override that can be reset later.'
+                  : 'Edit the custom checker configuration.'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            {editingChecker && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-white">Filename</Label>
+                    <Input
+                      value={editingChecker.value}
+                      onChange={(e) => setEditingChecker({...editingChecker, value: e.target.value})}
+                      className="cyber-glow"
+                      disabled={CHECKER_CONFIGS.some(c => c.value === editingChecker.value)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-white">Display Name</Label>
+                    <Input
+                      value={editingChecker.label}
+                      onChange={(e) => setEditingChecker({...editingChecker, label: e.target.value})}
+                      className="cyber-glow"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-white">Category</Label>
+                  <Select 
+                    value={editingChecker.category} 
+                    onValueChange={(value) => setEditingChecker({...editingChecker, category: value})}
+                  >
+                    <SelectTrigger className="cyber-glow">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={CHECKER_CATEGORIES.BASIC}>{CHECKER_CATEGORIES.BASIC}</SelectItem>
+                      <SelectItem value={CHECKER_CATEGORIES.AUTH}>{CHECKER_CATEGORIES.AUTH}</SelectItem>
+                      <SelectItem value={CHECKER_CATEGORIES.CHARGE}>{CHECKER_CATEGORIES.CHARGE}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-white">Description</Label>
+                  <Textarea
+                    value={editingChecker.description || ''}
+                    onChange={(e) => setEditingChecker({...editingChecker, description: e.target.value})}
+                    className="cyber-glow"
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveEditedChecker}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Quick Stats */}
