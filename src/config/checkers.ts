@@ -13,7 +13,9 @@ export interface CheckerConfig {
 export const CHECKER_CATEGORIES = {
   BASIC: '3mk baqer CHeckers 😈 🔥♛',
   AUTH: '3mk baqer AUTH CHeckers 😈 🔥♛', 
-  CHARGE: '3mk baqer CHARGE CHeckers 😈 🔥♛'
+  CHARGE: '3mk baqer CHARGE CHeckers 😈 🔥♛',
+  TOOLS: 'Tools',
+  OTHERS: 'Others'
 } as const;
 
 // Add your checkers here - the system will automatically create the dropdown options

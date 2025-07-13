@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Download, Upload, Save, Code, Settings, FileText, Zap, ArrowLeft, Copy, Eye, MoreHorizontal, Trash, CheckSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CHECKER_CONFIGS, CHECKER_CATEGORIES, CheckerConfig } from '@/config/checkers';
+import { getAllCategories, saveCustomCategory, createPHPFile } from '@/config/dynamicCheckers';
 
 interface PHPFile {
   filename: string;
@@ -39,6 +40,8 @@ const AdminPanel = () => {
   const [isEditingPHP, setIsEditingPHP] = useState(false);
   const [selectedCheckers, setSelectedCheckers] = useState<string[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>(() => getAllCategories());
   const { toast } = useToast();
 
   // Load saved data from localStorage
@@ -239,7 +242,7 @@ function determineBrand($cardNumber) {
     const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
     localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
 
-    // Generate PHP file
+    // Generate PHP file and auto-download
     const functionName = filename.replace(/[^a-zA-Z0-9]/g, '') + 'Check';
     const phpContent = generatePHPTemplate(newChecker.label, functionName);
     
@@ -252,6 +255,9 @@ function determineBrand($cardNumber) {
     const updatedPHPFiles = [...phpFiles, phpFile];
     setPHPFiles(updatedPHPFiles);
     localStorage.setItem('phpFiles', JSON.stringify(updatedPHPFiles));
+
+    // Auto-download the PHP file to user's php folder
+    createPHPFile(filename, phpContent);
 
     // Reset form
     setNewChecker({
@@ -544,19 +550,19 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label className="text-white">Category</Label>
-                    <Select value={newChecker.category} onValueChange={(value) => setNewChecker({...newChecker, category: value})}>
-                      <SelectTrigger className="cyber-glow">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={CHECKER_CATEGORIES.BASIC}>{CHECKER_CATEGORIES.BASIC}</SelectItem>
-                        <SelectItem value={CHECKER_CATEGORIES.AUTH}>{CHECKER_CATEGORIES.AUTH}</SelectItem>
-                        <SelectItem value={CHECKER_CATEGORIES.CHARGE}>{CHECKER_CATEGORIES.CHARGE}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                   <div className="space-y-2">
+                     <Label className="text-white">Category</Label>
+                     <Select value={newChecker.category} onValueChange={(value) => setNewChecker({...newChecker, category: value})}>
+                       <SelectTrigger className="cyber-glow">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {categories.map(category => (
+                           <SelectItem key={category} value={category}>{category}</SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
                 </div>
 
                 <div className="space-y-2">
@@ -567,6 +573,33 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                     onChange={(e) => setNewChecker({...newChecker, description: e.target.value})}
                     className="cyber-glow"
                   />
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="New category name"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="cyber-glow"
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      if (newCategory.trim()) {
+                        saveCustomCategory(newCategory.trim());
+                        setCategories(getAllCategories());
+                        setNewCategory('');
+                        toast({
+                          title: "Success",
+                          description: "Category added successfully",
+                        });
+                      }
+                    }}
+                    variant="outline"
+                  >
+                    Add Category
+                  </Button>
                 </div>
 
                 <Button onClick={addChecker} className="w-full">
@@ -668,14 +701,42 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                                   <Edit className="w-4 h-4" />
                                 </Button>
                                 
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => duplicateChecker(checker)}
-                                  className="cyber-glow"
-                                >
-                                  <Copy className="w-4 h-4" />
-                                </Button>
+                                 <Button 
+                                   size="sm" 
+                                   variant="outline" 
+                                   onClick={() => duplicateChecker(checker)}
+                                   className="cyber-glow"
+                                 >
+                                   <Copy className="w-4 h-4" />
+                                 </Button>
+                                 
+                                 <Button 
+                                   size="sm" 
+                                   variant="outline" 
+                                   onClick={() => {
+                                     // For built-in checkers, create/edit PHP file
+                                     const existingFile = phpFiles.find(f => f.filename === checker.value);
+                                     if (existingFile) {
+                                       editPHPFile(existingFile);
+                                     } else {
+                                       // Create new PHP file for built-in checker
+                                       const functionName = checker.value.replace(/[^a-zA-Z0-9]/g, '') + 'Check';
+                                       const phpContent = generatePHPTemplate(checker.label, functionName);
+                                       const newFile: PHPFile = {
+                                         filename: checker.value,
+                                         content: phpContent,
+                                         lastModified: new Date()
+                                       };
+                                       const updatedPHPFiles = [...phpFiles, newFile];
+                                       setPHPFiles(updatedPHPFiles);
+                                       localStorage.setItem('phpFiles', JSON.stringify(updatedPHPFiles));
+                                       editPHPFile(newFile);
+                                     }
+                                   }}
+                                   className="cyber-glow"
+                                 >
+                                   <Code className="w-4 h-4" />
+                                 </Button>
                                 
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
@@ -881,11 +942,11 @@ ${customCheckers.map(c => `  ${JSON.stringify(c)},`).join('\n')}
                     <SelectTrigger className="cyber-glow">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={CHECKER_CATEGORIES.BASIC}>{CHECKER_CATEGORIES.BASIC}</SelectItem>
-                      <SelectItem value={CHECKER_CATEGORIES.AUTH}>{CHECKER_CATEGORIES.AUTH}</SelectItem>
-                      <SelectItem value={CHECKER_CATEGORIES.CHARGE}>{CHECKER_CATEGORIES.CHARGE}</SelectItem>
-                    </SelectContent>
+                     <SelectContent>
+                       {categories.map(category => (
+                         <SelectItem key={category} value={category}>{category}</SelectItem>
+                       ))}
+                     </SelectContent>
                   </Select>
                 </div>
                 

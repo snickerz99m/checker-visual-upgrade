@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckerService } from '@/services/checkerService';
 import { CardCheckResponse } from '@/services/api';
 import { getDynamicGroupedCheckers, getAllCheckers } from '@/config/dynamicCheckers';
+import { CheckerConfig } from '@/config/checkers';
 
 interface CheckResult {
   card: string;
@@ -48,6 +49,7 @@ const CardChecker = () => {
   const [stripeKey, setStripeKey] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stopChecking, setStopChecking] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const { toast } = useToast();
 
   // Performance optimization: batch state updates to prevent excessive re-renders
@@ -117,6 +119,21 @@ const CardChecker = () => {
     window.addEventListener('checkersUpdated', handleCheckersUpdated);
     return () => window.removeEventListener('checkersUpdated', handleCheckersUpdated);
   }, []);
+  
+  // Filter checkers by category
+  const filteredCheckers = useMemo(() => {
+    if (selectedCategory === 'all') {
+      return groupedCheckers;
+    }
+    
+    const filtered: Record<string, CheckerConfig[]> = {};
+    Object.entries(groupedCheckers).forEach(([category, checkers]) => {
+      if (category === selectedCategory) {
+        filtered[category] = checkers;
+      }
+    });
+    return filtered;
+  }, [groupedCheckers, selectedCategory]);
   
   // Legacy checker options for backward compatibility
   const legacyCheckers = [
@@ -372,7 +389,24 @@ const CardChecker = () => {
             </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="cyber-glow">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {Object.keys(groupedCheckers).map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div className="space-y-2">
                 <label className="text-sm font-medium">Checker Type</label>
                 <Select value={checkerType} onValueChange={setCheckerType}>
@@ -381,18 +415,20 @@ const CardChecker = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {/* Legacy Checkers */}
-                    {legacyCheckers.map(option => (
+                    {selectedCategory === 'all' && legacyCheckers.map(option => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
                     ))}
                     
                     {/* Grouped Custom Checkers */}
-                    {Object.entries(groupedCheckers).map(([category, checkers]) => (
+                    {Object.entries(filteredCheckers).map(([category, checkers]) => (
                       <div key={category}>
-                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-t">
-                          {category}
-                        </div>
+                        {selectedCategory === 'all' && (
+                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-t">
+                            {category}
+                          </div>
+                        )}
                         {checkers.map(option => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}

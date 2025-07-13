@@ -84,68 +84,49 @@ export class CheckerService {
     onResult?: (result: CardCheckResponse & { index: number }) => void,
     onProgress?: (current: number, total: number) => void
   ) {
-    const { threadCount = 10, fastMode } = settings;
+    const { threadCount = 10, fastMode, requestDelay = 0 } = settings;
     let completedCount = 0;
-    const promises: Promise<void>[] = [];
 
-    // Ultra conservative limits to prevent browser crashes
-    const maxConcurrent = Math.min(
-      fastMode ? 5 : Math.min(threadCount, 3), // Very conservative limits
-      cards.length,
-      5 // Hard cap at 5 concurrent to prevent crashes
-    );
-    let currentIndex = 0;
+    // Proper concurrent processing based on user settings
+    const maxConcurrent = fastMode ? cards.length : Math.min(threadCount, cards.length);
+    
+    // Split cards into chunks for each thread
+    const chunkSize = Math.ceil(cards.length / maxConcurrent);
+    const chunks: string[][] = [];
+    
+    for (let i = 0; i < cards.length; i += chunkSize) {
+      chunks.push(cards.slice(i, i + chunkSize));
+    }
 
-    // Much larger batch sizes to reduce UI updates
-    let progressBatchCount = 0;
-    const PROGRESS_BATCH_SIZE = Math.max(25, Math.floor(cards.length / 20));
+    // Process each chunk concurrently
+    const promises = chunks.map(async (chunk, chunkIndex) => {
+      for (let i = 0; i < chunk.length; i++) {
+        if (!this.isRunning || this.abortController?.signal.aborted) {
+          break;
+        }
 
-    // Function to process a single card
-    const processNext = async (): Promise<void> => {
-      while (currentIndex < cards.length && this.isRunning && !this.abortController?.signal.aborted) {
-        const index = currentIndex++;
-        const card = cards[index];
+        const cardIndex = chunkIndex * chunkSize + i;
+        const card = chunk[i];
         
         try {
-          await this.processCard(index, card, checkerType, settings, stripeKey, onResult);
+          await this.processCard(cardIndex, card, checkerType, settings, stripeKey, onResult);
         } catch (error) {
-          console.error(`Error processing card at index ${index}:`, error);
+          console.error(`Error processing card at index ${cardIndex}:`, error);
         }
         
         completedCount++;
-        progressBatchCount++;
         
-        // Batch progress updates for performance
-        if (progressBatchCount >= PROGRESS_BATCH_SIZE || completedCount === cards.length) {
-          if (onProgress) {
-            onProgress(completedCount, cards.length);
-          }
-          progressBatchCount = 0;
+        // Update progress
+        if (onProgress) {
+          onProgress(completedCount, cards.length);
         }
 
-        // Much longer delays to prevent browser overload
-        const baseDelay = fastMode ? 500 : settings.requestDelay * 1000;
-        const adaptiveDelay = Math.max(baseDelay, cards.length > 100 ? 1000 : 500);
-        
-        await new Promise(resolve => setTimeout(resolve, adaptiveDelay));
-
-        // Aggressive memory management
-        if (completedCount % 10 === 0) {
-          // Force cleanup every 10 requests
-          await new Promise(resolve => setTimeout(resolve, 100));
-          if (typeof window !== 'undefined' && window.gc) {
-            window.gc();
-          }
+        // Apply delay only if not in fast mode
+        if (!fastMode && requestDelay > 0 && i < chunk.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, requestDelay * 1000));
         }
       }
-    };
-
-    // Start workers with significant staggering to prevent crashes
-    for (let i = 0; i < maxConcurrent; i++) {
-      // Always stagger startup with longer delays
-      await new Promise(resolve => setTimeout(resolve, i * 1000 + 500));
-      promises.push(processNext());
-    }
+    });
 
     await Promise.all(promises);
   }
@@ -180,19 +161,24 @@ export class CheckerService {
           stripeKey
         });
       } catch (error) {
-        // Fallback for localhost testing when PHP backend is not available
-        console.warn('PHP backend not available, using test response:', error);
-        result = {
-          status: Math.random() > 0.7 ? 'approved' : Math.random() > 0.5 ? 'declined' : 'ccn',
-          message: 'Test response - configure your PHP backend',
-          cardNumber,
-          bin: cardNumber.substring(0, 6),
-          brand: 'VISA',
-          country: 'US'
-        };
-        
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+        // Check if it's a network error (no PHP backend)
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.warn('PHP backend not available, using test response');
+          result = {
+            status: Math.random() > 0.7 ? 'approved' : Math.random() > 0.5 ? 'declined' : 'ccn',
+            message: 'Test response - configure your PHP backend',
+            cardNumber,
+            bin: cardNumber.substring(0, 6),
+            brand: 'VISA',
+            country: 'US'
+          };
+          
+          // Simulate processing time
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+        } else {
+          // Re-throw actual API errors (like from working PHP backend)
+          throw error;
+        }
       }
 
       // Notify parent component of result
