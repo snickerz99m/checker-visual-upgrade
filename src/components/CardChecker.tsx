@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { CheckerService } from '@/services/checkerService';
 import { CardCheckResponse } from '@/services/api';
-import { getGroupedCheckers, CHECKER_CONFIGS } from '@/config/checkers';
+import { getDynamicGroupedCheckers, getAllCheckers } from '@/config/dynamicCheckers';
 
 interface CheckResult {
   card: string;
@@ -103,8 +103,20 @@ const CardChecker = () => {
     }
   };
 
-  // Get grouped checkers from configuration
-  const groupedCheckers = useMemo(() => getGroupedCheckers(), []);
+  // Get grouped checkers from configuration (including custom ones)
+  const [groupedCheckers, setGroupedCheckers] = useState(() => getDynamicGroupedCheckers());
+  const [allCheckers, setAllCheckers] = useState(() => getAllCheckers());
+  
+  // Listen for checker updates
+  useEffect(() => {
+    const handleCheckersUpdated = () => {
+      setGroupedCheckers(getDynamicGroupedCheckers());
+      setAllCheckers(getAllCheckers());
+    };
+    
+    window.addEventListener('checkersUpdated', handleCheckersUpdated);
+    return () => window.removeEventListener('checkersUpdated', handleCheckersUpdated);
+  }, []);
   
   // Legacy checker options for backward compatibility
   const legacyCheckers = [
@@ -211,7 +223,7 @@ const CardChecker = () => {
     setStopChecking(false);
     setCurrentIndex(0);
     
-    const selectedChecker = [...legacyCheckers, ...CHECKER_CONFIGS].find(opt => opt.value === checkerType);
+    const selectedChecker = [...legacyCheckers, ...allCheckers].find(opt => opt.value === checkerType);
     toast({
       title: "Checking completed",
       description: `Checked ${cardList.length} cards using ${selectedChecker?.label || checkerType}`,

@@ -1,4 +1,4 @@
-import { getAllCheckerFiles } from '@/config/checkers';
+import { getAllDynamicCheckerFiles } from '@/config/dynamicCheckers';
 
 // API Configuration - Easy to customize for your PHP backend
 export const API_CONFIG = {
@@ -17,9 +17,9 @@ export const API_CONFIG = {
     binChecker: './php/bin-checker.php',
     ccGenerator: './php/cc-generator.php',
     
-    // Dynamic endpoints for all configured checkers
+    // Dynamic endpoints for all configured checkers (including custom ones)
     ...Object.fromEntries(
-      getAllCheckerFiles().map(filename => [
+      getAllDynamicCheckerFiles().map(filename => [
         filename.replace('.php', ''),
         `./php/${filename}`
       ])

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Ghost, ExternalLink, MessageCircle } from 'lucide-react';
+import { Ghost, ExternalLink, MessageCircle, Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 
 const Header = () => {
   const [activeTab, setActiveTab] = useState('bin-checker');
+  const location = useLocation();
 
   return (
     <div className="w-full">
@@ -51,6 +53,16 @@ const Header = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <Link to="/admin">
+                <Button 
+                  variant={location.pathname === '/admin' ? 'default' : 'outline'} 
+                  size="sm"
+                  className="cyber-glow"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Admin Panel
+                </Button>
+              </Link>
               <Badge variant="secondary" className="cyber-glow">
                 👻 Elite
               </Badge>
