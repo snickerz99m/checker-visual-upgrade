@@ -120,8 +120,8 @@ const CardChecker = () => {
     return () => window.removeEventListener('checkersUpdated', handleCheckersUpdated);
   }, []);
   
-  // Filter checkers by category
-  const filteredCheckers = useMemo(() => {
+  // Filter checkers by category - memo to prevent recreation on each render
+  const categoryFilteredCheckers = useMemo(() => {
     if (selectedCategory === 'all') {
       return groupedCheckers;
     }
@@ -422,7 +422,7 @@ const CardChecker = () => {
                     ))}
                     
                     {/* Grouped Custom Checkers */}
-                    {Object.entries(filteredCheckers).map(([category, checkers]) => (
+                    {Object.entries(categoryFilteredCheckers).map(([category, checkers]) => (
                       <div key={category}>
                         {selectedCategory === 'all' && (
                           <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-t">
