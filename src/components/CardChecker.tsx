@@ -27,7 +27,7 @@ interface CheckResult {
 
 const CardChecker = () => {
   const [cards, setCards] = useState('');
-  const [checkerType, setCheckerType] = useState('stripe');
+  const [checkerType, setCheckerType] = useState('attacker.php');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CheckResult[]>([]);
   const [showResults, setShowResults] = useState(false);
