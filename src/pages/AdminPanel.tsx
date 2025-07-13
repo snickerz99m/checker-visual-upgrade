@@ -238,9 +238,13 @@ function determineBrand($cardNumber) {
     const updatedCheckers = [...checkers, checker];
     setCheckers(updatedCheckers);
 
-    // Save custom checkers to localStorage
+    // Save custom checkers to localStorage and trigger update event
     const customCheckers = updatedCheckers.filter(c => !CHECKER_CONFIGS.includes(c));
     localStorage.setItem('customCheckers', JSON.stringify(customCheckers));
+    
+    // Trigger events to update components and API endpoints
+    window.dispatchEvent(new CustomEvent('checkersUpdated'));
+    window.dispatchEvent(new CustomEvent('apiEndpointsUpdated'));
 
     // Generate PHP file and auto-download
     const functionName = filename.replace(/[^a-zA-Z0-9]/g, '') + 'Check';

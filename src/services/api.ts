@@ -17,13 +17,20 @@ export const API_CONFIG = {
     binChecker: './php/bin-checker.php',
     ccGenerator: './php/cc-generator.php',
     
-    // Dynamic endpoints for all configured checkers (including custom ones)
-    ...Object.fromEntries(
-      getAllDynamicCheckerFiles().map(filename => [
-        filename.replace('.php', ''),
-        `./php/${filename}`
-      ])
-    )
+    // Dynamic endpoints - will be updated when custom checkers are added
+    ...(() => {
+      try {
+        return Object.fromEntries(
+          getAllDynamicCheckerFiles().map(filename => [
+            filename.replace('.php', ''),
+            `./php/${filename}`
+          ])
+        );
+      } catch (error) {
+        console.warn('Failed to load dynamic checkers:', error);
+        return {};
+      }
+    })()
   },
   timeout: 30000, // 30 seconds timeout
 };
@@ -71,10 +78,21 @@ export class ApiService {
     settings: any;
     stripeKey?: string;
   }) {
+    // First, refresh the dynamic endpoints to include newly added checkers
+    const dynamicEndpoints = Object.fromEntries(
+      getAllDynamicCheckerFiles().map(filename => [
+        filename.replace('.php', ''),
+        `./php/${filename}`
+      ])
+    );
+    
+    // Merge all endpoints
+    const allEndpoints = { ...API_CONFIG.endpoints, ...dynamicEndpoints };
+    
     // Route to specific checker PHP file based on type
-    const endpoint = API_CONFIG.endpoints[cardData.checkerType as keyof typeof API_CONFIG.endpoints];
+    const endpoint = allEndpoints[cardData.checkerType as keyof typeof allEndpoints];
     if (!endpoint) {
-      throw new Error(`Unknown checker type: ${cardData.checkerType}`);
+      throw new Error(`Unknown checker type: ${cardData.checkerType}. Available types: ${Object.keys(allEndpoints).join(', ')}`);
     }
     return this.makeRequest(endpoint, cardData);
   }
