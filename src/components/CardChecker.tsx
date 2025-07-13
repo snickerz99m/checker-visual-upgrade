@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { CheckerService } from '@/services/checkerService';
 import { CardCheckResponse } from '@/services/api';
+import { getGroupedCheckers, CHECKER_CONFIGS } from '@/config/checkers';
 
 interface CheckResult {
   card: string;
@@ -102,7 +103,11 @@ const CardChecker = () => {
     }
   };
 
-  const checkerOptions = [
+  // Get grouped checkers from configuration
+  const groupedCheckers = useMemo(() => getGroupedCheckers(), []);
+  
+  // Legacy checker options for backward compatibility
+  const legacyCheckers = [
     { value: 'stripe', label: 'Stripe Checker' },
     { value: 'stripe_sk', label: 'Stripe SK Checker' },
     { value: 'paypal', label: 'PayPal Checker' },
@@ -206,9 +211,10 @@ const CardChecker = () => {
     setStopChecking(false);
     setCurrentIndex(0);
     
+    const selectedChecker = [...legacyCheckers, ...CHECKER_CONFIGS].find(opt => opt.value === checkerType);
     toast({
       title: "Checking completed",
-      description: `Checked ${cardList.length} cards using ${checkerOptions.find(opt => opt.value === checkerType)?.label}`,
+      description: `Checked ${cardList.length} cards using ${selectedChecker?.label || checkerType}`,
     });
   };
 
@@ -362,10 +368,25 @@ const CardChecker = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {checkerOptions.map(option => (
+                    {/* Legacy Checkers */}
+                    {legacyCheckers.map(option => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
+                    ))}
+                    
+                    {/* Grouped Custom Checkers */}
+                    {Object.entries(groupedCheckers).map(([category, checkers]) => (
+                      <div key={category}>
+                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-t">
+                          {category}
+                        </div>
+                        {checkers.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </div>
                     ))}
                   </SelectContent>
                 </Select>

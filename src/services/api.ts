@@ -1,10 +1,12 @@
+import { getAllCheckerFiles } from '@/config/checkers';
+
 // API Configuration - Easy to customize for your PHP backend
 export const API_CONFIG = {
   // IMPORTANT: Works with any deployment path (public_html, subfolders, etc.)
   // Uses relative paths to work in any directory structure
   baseUrl: '', // Empty for relative paths
   endpoints: {
-    // PHP files should be in your php/ folder relative to the app
+    // Legacy endpoints for backward compatibility
     stripe: './php/stripe-checker.php',
     stripe_sk: './php/stripe-sk-checker.php', 
     paypal: './php/paypal-checker.php',
@@ -13,7 +15,15 @@ export const API_CONFIG = {
     authorize: './php/authorize-checker.php',
     shopify: './php/shopify-checker.php',
     binChecker: './php/bin-checker.php',
-    ccGenerator: './php/cc-generator.php'
+    ccGenerator: './php/cc-generator.php',
+    
+    // Dynamic endpoints for all configured checkers
+    ...Object.fromEntries(
+      getAllCheckerFiles().map(filename => [
+        filename.replace('.php', ''),
+        `./php/${filename}`
+      ])
+    )
   },
   timeout: 30000, // 30 seconds timeout
 };
